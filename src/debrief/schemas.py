@@ -83,7 +83,7 @@ class PostMortem(BaseModel):
 
 class VerifiedSolution(BaseModel):
     """Soluzione fornita da un umano e catturata dal resolver.
-    Indicizzata in LanceDB come fonte ad alta priorita'."""
+    Indicizzata in LanceDB come fonte ad alta priorità."""
     incident_id: str
     problem_context: str
     solution: str

@@ -1,5 +1,5 @@
 {
-  "_note": "Questa mappa e' la GROUND TRUTH per la valutazione del retrieval. Ogni cluster raggruppa incidenti che descrivono lo stesso tipo di problema con parole diverse. L'investigator deve recuperare i membri dello stesso cluster come 'simili'.",
+  "_note": "Questa mappa è la GROUND TRUTH per la valutazione del retrieval. Ogni cluster raggruppa incidenti che descrivono lo stesso tipo di problema con parole diverse. L'investigator deve recuperare i membri dello stesso cluster come 'simili'.",
   "clusters": {
     "db_connection_pool": {
       "description": "Problemi di connessione al database sotto carico",

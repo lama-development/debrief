@@ -9,7 +9,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 APP_SECRET_KEY = os.getenv("APP_SECRET_KEY", "dev-secret-change-me")
 
-# --- Modelli Groq (verificare disponibilita' su console.groq.com) ---
+# --- Modelli Groq (verificare disponibilità su console.groq.com) ---
 MODELS = {
     "orchestrator": "llama-3.1-8b-instant",
     "triage": "gpt-oss-20b",
@@ -34,7 +34,7 @@ TOP_K_KB = 3                      # risultati per knowledge_base
 TEMPERATURE = {
     "orchestrator": 0.0,          # deterministico
     "triage": 0.0,                # deterministico
-    "investigator": 0.2,          # minima variabilita'
-    "resolver": 0.3,              # creativita' controllata
+    "investigator": 0.2,          # minima variabilità
+    "resolver": 0.3,              # creatività controllata
 }
 MAX_REPAIR_RETRIES = 2            # tentativi di repair su JSON malformato
