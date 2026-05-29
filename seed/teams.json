@@ -1,0 +1,38 @@
+[
+  {
+    "id": "it_internal",
+    "name": "IT Interno",
+    "description": "Team IT aziendale",
+    "contact_info": "it@azienda.local"
+  },
+  {
+    "id": "production",
+    "name": "Reparto Produzione",
+    "description": "Responsabili linee produttive e macchinari",
+    "contact_info": "produzione@azienda.local"
+  },
+  {
+    "id": "plc_vendor",
+    "name": "Fornitore PLC/Automazione",
+    "description": "Azienda esterna per manutenzione PLC e macchinari",
+    "contact_info": "support@plc-vendor.ext"
+  },
+  {
+    "id": "network_vendor",
+    "name": "Fornitore Rete",
+    "description": "Azienda esterna per infrastruttura di rete",
+    "contact_info": "support@network-vendor.ext"
+  },
+  {
+    "id": "software_vendor",
+    "name": "Fornitore Software",
+    "description": "Supporto per applicativi gestionali e ERP",
+    "contact_info": "support@software-vendor.ext"
+  },
+  {
+    "id": "management",
+    "name": "Direzione",
+    "description": "Da coinvolgere per incidenti SEV1 con impatto su produzione",
+    "contact_info": "direzione@azienda.local"
+  }
+]

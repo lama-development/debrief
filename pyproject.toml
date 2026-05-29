@@ -1,0 +1,34 @@
+[project]
+name = "debrief"
+version = "0.1.0"
+description = "Incident Response Multi-Agent Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "agno",
+    "groq",
+    "lancedb",
+    "sentence-transformers",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "python-dotenv",
+    "bcrypt",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx",
+    "pytest",
+]
+
+[project.scripts]
+seed = "seed.run_seed:main"
+dev = "uvicorn:main"
+eval = "eval.run_eval:main"
+
+[tool.uv]
+dev-dependencies = [
+    "httpx",
+    "pytest",
+]
