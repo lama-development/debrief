@@ -1,38 +1,44 @@
 [
   {
-    "id": "it_internal",
+    "id": "IT_INTERNAL",
     "name": "IT Interno",
-    "description": "Team IT aziendale",
-    "contact_info": "it@azienda.local"
+    "description": "Team IT aziendale. Helpdesk, gestione postazioni, coordinamento fornitori, supporto primo livello.",
+    "contact_info": "it@adcompound.com"
   },
   {
-    "id": "production",
-    "name": "Reparto Produzione",
-    "description": "Responsabili linee produttive e macchinari",
-    "contact_info": "produzione@azienda.local"
+    "id": "IT_DEV",
+    "name": "Sviluppatori Genius",
+    "description": "Team esterno dedicato che mantiene gli applicativi proprietari Genius, Genius Logistics e il database su srv-db. Responsabili di bug, aggiornamenti, migrazioni e problemi applicativi.",
+    "contact_info": "genius@adcompound.com"
   },
   {
-    "id": "plc_vendor",
-    "name": "Fornitore PLC/Automazione",
-    "description": "Azienda esterna per manutenzione PLC e macchinari",
+    "id": "IT_EXTERNAL",
+    "name": "2000net Srl",
+    "description": "Fornitore esterno infrastruttura IT. Gestisce: rete (switch Cisco, VLAN), firewall FortiGate, virtualizzazione server, GPO Active Directory, backup Veeam, manutenzione server. Non gestisce gli applicativi Genius.",
+    "contact_info": "supporto@2000net.it"
+  },
+  {
+    "id": "PLC_VENDOR",
+    "name": "Fornitore Automazione/PLC",
+    "description": "Azienda esterna specializzata per manutenzione PLC Siemens, linee produttive, sistemi Profinet e Movicon Next. L'IT interno NON interviene su PLC e automazione.",
     "contact_info": "support@plc-vendor.ext"
   },
   {
-    "id": "network_vendor",
-    "name": "Fornitore Rete",
-    "description": "Azienda esterna per infrastruttura di rete",
-    "contact_info": "support@network-vendor.ext"
+    "id": "PRODUCTION",
+    "name": "Reparto Produzione",
+    "description": "Capoturno e responsabili delle aree produttive (CMP, macinazione, agglomerazione, insacco, estrusione, silos, trituratore TR2-5, granulazione). Primi a segnalare fermi e allarmi macchinario.",
+    "contact_info": "produzione@adcompound.com"
   },
   {
-    "id": "software_vendor",
-    "name": "Fornitore Software",
-    "description": "Supporto per applicativi gestionali e ERP",
-    "contact_info": "support@software-vendor.ext"
+    "id": "LAB",
+    "name": "Laboratorio (R&D e Analisi)",
+    "description": "Responsabili del laboratorio. Da coinvolgere per problemi su postazioni strumentazione (METTLER TOLEDO STARe), postazioni condivise lab e software dedicato.",
+    "contact_info": "lab@adcompound.com"
   },
   {
-    "id": "management",
+    "id": "MANAGEMENT",
     "name": "Direzione",
-    "description": "Da coinvolgere per incidenti SEV1 con impatto su produzione",
-    "contact_info": "direzione@azienda.local"
+    "description": "Da coinvolgere per incidenti SEV1 con impatto significativo su produzione, clienti o sicurezza. Comunicazione obbligatoria per fermi produttivi prolungati.",
+    "contact_info": "direzione@adcompound.com"
   }
 ]
