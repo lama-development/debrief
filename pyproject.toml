@@ -27,8 +27,12 @@ seed = "seed.run_seed:main"
 dev = "uvicorn:main"
 eval = "eval.run_eval:main"
 
-[tool.uv]
-dev-dependencies = [
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
     "httpx",
     "pytest",
 ]
