@@ -18,9 +18,9 @@ def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
         model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-        print(f"↻ Caricamento modello embedding: {model_name}...")
+        print(f"🔵 Loading embedding model: {model_name}...")
         _model = SentenceTransformer(model_name)
-        print(f"✓ Modello caricato (dimensione vettore: {_model.get_embedding_dimension()})")
+        print(f"🟢 Model loaded (vector dimension: {_model.get_embedding_dimension()})")
     return _model
 
 
@@ -41,5 +41,5 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 # Test rapido se esegui il file direttamente
 if __name__ == "__main__":
     test = embed_text("PLC fermo in produzione, linea bloccata")
-    print(f"✓ Embedding calcolato: {len(test)} dimensioni")
-    print(f"Primi 5 valori: {test[:5]}")
+    print(f"🟢 Embedding computed: {len(test)} dimensions")
+    print(f"First 5 values: {test[:5]}")

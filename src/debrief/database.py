@@ -138,5 +138,5 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
 if __name__ == "__main__":
     conn = get_connection()
     create_tables(conn)
-    print("✓ Tabelle SQLite create")
+    print("🟢 SQLite tables created")
     conn.close()

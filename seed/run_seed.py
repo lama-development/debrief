@@ -26,10 +26,7 @@ from debrief.rag.indexer import get_db, index_incidents, index_knowledge_base, i
 
 
 def main():
-    print("=" * 60)
-    print("Inizio seed database.")
-    print("=" * 60)
-    print()
+    print("\n🟣 Starting database seed\n")
 
     # Percorsi (relativi alla root del progetto)
     seed_dir = os.path.join(os.path.dirname(__file__))
@@ -39,22 +36,22 @@ def main():
     kb_dir = os.path.join(seed_dir, "knowledge_base")
 
     # --- 1. SQLite ---
-    print("↻ Setup SQLite...")
+    print("🔵 Setting up SQLite...")
     conn = get_connection()
     create_tables(conn)
-    print("✓ Tabelle create")
+    print("🟢 Tables created")
 
     n_teams = load_teams(conn, teams_path)
-    print(f"✓ {n_teams} team caricati")
+    print(f"🟢 {n_teams} teams loaded")
 
     n_incidents = load_incidents(conn, incidents_path)
-    print(f"✓ {n_incidents} incidenti caricati")
+    print(f"🟢 {n_incidents} incidents loaded")
 
     conn.close()
     print()
 
     # --- 2. Carica i dati per l'indicizzazione ---
-    print("↻ Preparazione dati per LanceDB...")
+    print("🔵 Preparing data for LanceDB...")
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
@@ -73,7 +70,7 @@ def main():
             "text": text,
         })
 
-    print(f"✓ {len(incidents)} incidenti, {len(solutions)} soluzioni, {len(kb_docs)} runbook pronti")
+    print(f"🟢 {len(incidents)} incidents, {len(solutions)} solutions, {len(kb_docs)} runbooks ready")
 
     # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
     # Il testo indicizzato in LanceDB sara' leggibile e autocontenuto,
@@ -91,11 +88,11 @@ def main():
                 doc["text"] = doc["text"].replace(placeholder, team_name)
                 placeholders_resolved += count
 
-    print(f"✓ {placeholders_resolved} placeholder team risolti nei runbook")
+    print(f"🟢 {placeholders_resolved} team placeholders resolved in runbooks")
     print()
 
     # --- 3. Calcola gli embedding ---
-    print("↻ Calcolo embedding...")
+    print("🔵 Computing embeddings...")
 
     # Testi da incorporare per ogni tipo
     incident_texts = [_build_incident_text(inc) for inc in incidents]
@@ -115,27 +112,25 @@ def main():
     print()
 
     # --- 4. Indicizza in LanceDB ---
-    print("↻ Indicizzazione in LanceDB...")
+    print("🔵 Indexing into LanceDB...")
     db = get_db()
 
     n = index_incidents(db, incidents, incident_vectors)
-    print(f"✓ {n} incidenti indicizzati in 'past_incidents'")
+    print(f"🟢 {n} incidents indexed in 'past_incidents'")
 
     n = index_verified_solutions(db, solutions, solution_vectors)
-    print(f"✓ {n} soluzioni indicizzate in 'verified_solutions'")
+    print(f"🟢 {n} solutions indexed in 'verified_solutions'")
 
     n = index_knowledge_base(db, kb_docs, kb_vectors)
-    print(f"✓ {n} runbook indicizzati in 'knowledge_base'")
+    print(f"🟢 {n} runbooks indexed in 'knowledge_base'")
     print()
 
     # --- 5. Test di ricerca ---
-    print("↻ Test di ricerca semantica...")
+    print("🔵 Semantic search test...")
     print()
 
     test_queries = [
-        ("PLC fermo in produzione, linea bloccata", "past_incidents"),
         ("il disco del server è pieno", "past_incidents"),
-        ("Outlook non funziona, la posta non si sincronizza", "past_incidents"),
         ("come gestire un errore del PLC", "knowledge_base"),
         ("sensore di temperatura guasto sul macchinario", "verified_solutions"),
     ]
@@ -144,20 +139,18 @@ def main():
         query_vec = embed_text(query)
         results = search(db, table, query_vec, k=3, threshold=0.3)
 
-        print(f"  Query: \"{query}\" [{table}]")
+        print(f"🔵 Query: \"{query}\" [{table}]")
         if results:
             for r in results:
                 similarity = 1 - r["_distance"] / 2  # distanza L2 -> coseno
                 id_field = r.get("id", "?")
-                title_field = r.get("title", r.get("problem_context", "")[:60])
-                print(f"    → {id_field} ({similarity:.2f}) {title_field}")
+                title_field = r.get("title", r.get("problem_context", "")[:60]) + "..."
+                print(f"🟢 {id_field} ({similarity:.2f}) {title_field}")
         else:
-            print(f"    → Nessun risultato sopra soglia")
+            print(f"🔴 No results above threshold")
         print()
 
-    print("=" * 60)
-    print("Seed completato! Il database è pronto.")
-    print("=" * 60)
+    print("🟣 Seed complete! The database is ready.\n")
 
 
 if __name__ == "__main__":
