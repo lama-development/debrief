@@ -5,8 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-# --- Enum ---
-
+# Enum
 class Category(str, Enum):
     INFRASTRUCTURE = "infrastructure"
     APPLICATION = "application"
@@ -45,8 +44,7 @@ class AgentRole(str, Enum):
     NONE = "none"
 
 
-# --- Output strutturati ---
-
+# Output strutturati
 class TriageOutput(BaseModel):
     """Output del triage agent. Validato prima della scrittura nel DB."""
     title: str
