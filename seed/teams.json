@@ -15,11 +15,11 @@
     "id": "IT_EXTERNAL",
     "name": "2000net Srl",
     "description": "Fornitore esterno infrastruttura IT. Gestisce: rete (switch Cisco, VLAN), firewall FortiGate, virtualizzazione server, GPO Active Directory, backup Veeam, manutenzione server. Non gestisce gli applicativi Genius.",
-    "contact_info": "supporto@2000net.it"
+    "contact_info": "support@2000net.it"
   },
   {
     "id": "PLC_VENDOR",
-    "name": "Fornitore Automazione/PLC",
+    "name": "Fornitore PLC",
     "description": "Azienda esterna specializzata per manutenzione PLC Siemens, linee produttive, sistemi Profinet e Movicon Next. L'IT interno NON interviene su PLC e automazione.",
     "contact_info": "support@plc-vendor.ext"
   },
@@ -31,7 +31,7 @@
   },
   {
     "id": "LAB",
-    "name": "Laboratorio (R&D e Analisi)",
+    "name": "Laboratorio",
     "description": "Responsabili del laboratorio. Da coinvolgere per problemi su postazioni strumentazione (METTLER TOLEDO STARe), postazioni condivise lab e software dedicato.",
     "contact_info": "lab@adcompound.com"
   },

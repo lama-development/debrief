@@ -73,7 +73,7 @@ def main():
     print(f"🟢 {len(incidents)} incidents, {len(solutions)} solutions, {len(kb_docs)} runbooks ready")
 
     # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
-    # Il testo indicizzato in LanceDB sara' leggibile e autocontenuto,
+    # Il testo indicizzato in LanceDB sarà leggibile e autocontenuto,
     # ma nel sorgente markdown cambi il nome in un posto solo (teams.json).
     with open(teams_path, encoding="utf-8") as f:
         teams = json.load(f)
@@ -144,7 +144,7 @@ def main():
             for r in results:
                 similarity = 1 - r["_distance"] / 2  # distanza L2 -> coseno
                 id_field = r.get("id", "?")
-                title_field = r.get("title", r.get("problem_context", "")[:60]) + "..."
+                title_field = r.get("title", r.get("problem_context", "")[:60])
                 print(f"🟢 {id_field} ({similarity:.2f}) {title_field}")
         else:
             print(f"🔴 No results above threshold")

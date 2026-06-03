@@ -10,7 +10,7 @@ APP_SECRET_KEY = os.getenv("APP_SECRET_KEY", "dev-secret-change-me")
 # Modelli Groq
 MODELS = {
     "orchestrator": "llama-3.1-8b-instant",
-    "triage": "gpt-oss-20b",
+    "triage": "llama-3.3-70b-versatile",
     "investigator": "llama-3.3-70b-versatile",
     "resolver": "llama-3.3-70b-versatile",
 }
