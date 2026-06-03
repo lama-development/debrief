@@ -10,7 +10,7 @@
 | srv-apps3  | Applicativi vari                            |                           |
 | srv-db     | Database (Genius e altri)                   | Database critico          |
 
-Virtualizzazione e manutenzione server gestite da {{IT_EXTERNAL}}.
+Virtualizzazione e manutenzione server gestite da `{{IT_EXTERNAL}}`.
 
 ## Spazio disco
 
@@ -23,7 +23,7 @@ Virtualizzazione e manutenzione server gestite da {{IT_EXTERNAL}}.
 
 ### Procedura di emergenza
 
-1. Se il server non e' raggiungibile via RDP: accesso fisico in sala server (o chiedere a {{IT_EXTERNAL}} per le VM)
+1. Se il server non è raggiungibile via RDP: accesso fisico in sala server (o chiedere a `{{IT_EXTERNAL}}` per le VM)
 2. Identificare cosa occupa spazio:
    - Windows: `dir /s /o-s C:\` oppure WinDirStat
    - Linux: `du -sh /* | sort -rh`
@@ -36,8 +36,8 @@ Virtualizzazione e manutenzione server gestite da {{IT_EXTERNAL}}.
 
 ### Server specifici
 
-- **srv-file1**: le shadow copies occupano spazio sullo stesso volume. Se il disco si riempie, le shadow copies piu' vecchie vengono eliminate automaticamente ma potrebbe non bastare.
-- **srv-db**: il database di Genius cresce nel tempo. Se lo spazio si esaurisce, Genius smette di funzionare per tutti. Verificare anche i log del database. Per problemi sul database contattare {{GENIUS_DEV}}, per spazio disco della VM contattare {{IT_EXTERNAL}}.
+- **srv-file1**: le shadow copies occupano spazio sullo stesso volume. Se il disco si riempie, le shadow copies più vecchie vengono eliminate automaticamente ma potrebbe non bastare.
+- **srv-db**: il database di Genius cresce nel tempo. Se lo spazio si esaurisce, Genius smette di funzionare per tutti. Verificare anche i log del database. Per problemi sul database contattare `{{IT_DEV}}`, per spazio disco della VM contattare `{{IT_EXTERNAL}}`.
 - **srv-tsplus**: le sessioni utente creano profili temporanei. Con ~30 utenti attivi, i profili possono accumularsi.
 
 ## Backup
@@ -49,19 +49,19 @@ Virtualizzazione e manutenzione server gestite da {{IT_EXTERNAL}}.
 - Accessibili dagli utenti: tasto destro sulla cartella > "Versioni precedenti"
 - Se un utente cancella un file per errore, recuperarlo dalle versioni precedenti PRIMA che vengano sovrascritte
 
-### Veeam (gestito da {{IT_EXTERNAL}})
+### Veeam (gestito da `{{IT_EXTERNAL}}`)
 
 - Backup avanzato di tutti i server virtualizzati
-- Per ripristini da Veeam: contattare {{IT_EXTERNAL}} con nome del server, data/ora del ripristino desiderato e cosa deve essere ripristinato
+- Per ripristini da Veeam: contattare `{{IT_EXTERNAL}}` con nome del server, data/ora del ripristino desiderato e cosa deve essere ripristinato
 
 ### Verifica backup
 
 Controllare periodicamente (almeno settimanale):
 
 - Le shadow copies su srv-file1 sono attive? (vssadmin list shadows)
-- L'ultimo backup Veeam e' andato a buon fine? (chiedere report a {{IT_EXTERNAL}})
+- L'ultimo backup Veeam è andato a buon fine? (chiedere report a `{{IT_EXTERNAL}}`)
 
 ## Escalation
 
-- Problemi su VM, risorse server, Veeam → {{IT_EXTERNAL}}
-- Disco pieno su srv-db con impatto su Genius → {{GENIUS_DEV}} (database) + {{IT_EXTERNAL}} (spazio VM)
+- Problemi su VM, risorse server, Veeam → `{{IT_EXTERNAL}}`
+- Disco pieno su srv-db con impatto su Genius → `{{IT_DEV}}` (database) + `{{IT_EXTERNAL}}` (spazio VM)
