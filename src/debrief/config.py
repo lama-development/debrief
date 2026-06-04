@@ -5,7 +5,6 @@ load_dotenv()
 
 # API Keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-APP_SECRET_KEY = os.getenv("APP_SECRET_KEY", "dev-secret-change-me")
 
 # Modelli Groq
 MODELS = {
@@ -16,15 +15,15 @@ MODELS = {
 }
 
 # Embedding (locale)
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # Database
-SQLITE_PATH = os.getenv("SQLITE_PATH", "data/debrief.db")
-LANCEDB_PATH = os.getenv("LANCEDB_PATH", "data/lancedb")
+SQLITE_PATH = "data/debrief.db"
+LANCEDB_PATH = "data/lancedb"
 
 # RAG
-SIMILARITY_THRESHOLD = 0.65       # soglia minima per considerare un match "simile"
-TOP_K_INCIDENTS = 5               # risultati per past_incidents
+SIMILARITY_THRESHOLD = 0.35       # soglia minima per considerare un match "simile"
+TOP_K_INCIDENTS = 3               # risultati per past_incidents
 TOP_K_VERIFIED = 3                # risultati per verified_solutions
 TOP_K_KB = 3                      # risultati per knowledge_base
 
