@@ -17,7 +17,7 @@ def get_model() -> SentenceTransformer:
     """Carica il modello di embedding."""
     global _model
     if _model is None:
-        model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
         print(f"🔵 Loading embedding model: {model_name}...")
         _model = SentenceTransformer(model_name)
         print(f"🟢 Model loaded (vector dimension: {_model.get_embedding_dimension()})")
