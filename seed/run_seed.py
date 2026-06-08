@@ -150,7 +150,7 @@ def main():
             print(f"🔴 No results above threshold")
         print()
 
-    print("🟣 Seed complete! The database is ready.\n")
+    print("🟣 Seed complete! The database is ready.")
 
 
 if __name__ == "__main__":
