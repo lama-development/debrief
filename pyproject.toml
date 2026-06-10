@@ -24,7 +24,7 @@ dev = [
 
 [project.scripts]
 seed = "seed.run_seed:main"
-dev = "uvicorn:main"
+dev = "debrief.api.app:main"
 eval = "eval.run_eval:main"
 
 [build-system]
