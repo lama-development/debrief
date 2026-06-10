@@ -1,11 +1,15 @@
 """
-retriever.py - Application-layer retrieval and runtime indexing.
+retriever.py - Recupero a livello applicativo e indicizzazione a runtime.
 
-tools/search.py  →  agents (formatted strings for Agno tool calls)
-rag/retriever.py →  application / API layer (structured dicts)
+Differenza chiave con tools/search.py:
+  tools/search.py  →  per gli AGENTI: restituisce STRINGHE formattate (Agno tool)
+  rag/retriever.py →  per l'APP / API: restituisce DICT strutturati (dati grezzi)
 
-Also handles the closed loop: adding resolved incidents and human-verified
-solutions back to LanceDB at runtime so the system learns over time.
+Stessa ricerca sotto, due "vestiti" diversi a seconda di chi consuma il risultato:
+un LLM vuole testo leggibile, il codice applicativo vuole dati strutturati.
+
+Gestisce anche il "loop chiuso": riaggiungere a LanceDB gli incidenti risolti e
+le soluzioni verificate, così il sistema IMPARA col tempo.
 """
 
 import json
@@ -31,10 +35,15 @@ def retrieve_similar_incidents(
         Lista di record con i campi originali più 'similarity' (0-1, coseno).
         Lista vuota se nessun match supera la soglia o in caso di errore.
     """
+    # try/except: se qualcosa va storto (DB assente, ecc.) NON facciamo crashare
+    # l'app: logghiamo e restituiamo lista vuota. Il chiamante gestisce "nessun
+    # risultato" allo stesso modo di un errore.
     try:
         vector = embed_text(query)
         db = get_db()
         results = search(db, "past_incidents", vector, k=k, threshold=threshold)
+        # Aggiungiamo un campo 'similarity' leggibile (0-1) a ogni risultato, così
+        # il layer applicativo non deve conoscere la formula distanza→similarità.
         for r in results:
             r["similarity"] = round(1 - r["_distance"] / 2, 4)
         return results
@@ -102,6 +111,8 @@ def index_new_incident(incident: dict) -> None:
                    se ritentare o loggare.
     """
     try:
+        # `A or B` → se _build_incident_text restituisce stringa vuota (falsy),
+        # ripiega su incident["text"]. Garantiamo di avere SEMPRE del testo da embeddare.
         text = _build_incident_text(incident) or incident.get("text", "")
         vector = embed_text(text)
         record = {
@@ -117,10 +128,13 @@ def index_new_incident(incident: dict) -> None:
             "vector": vector,
         }
         db = get_db()
+        # open_table(...).add([record]) → appende il record alla tabella esistente.
         db.open_table("past_incidents").add([record])
         print(f"🟢 Indexed new incident: {incident['id']}")
     except Exception as e:
         print(f"🔴 index_new_incident failed for {incident.get('id', '?')}: {e}")
+        # `raise` senza argomenti ri-solleva l'eccezione appena catturata: la
+        # logghiamo ma lasciamo decidere al chiamante cosa farne.
         raise
 
 
@@ -137,6 +151,8 @@ def index_new_verified_solution(solution: dict) -> None:
         Exception: se l'aggiunta fallisce. Il chiamante decide se ritentare.
     """
     try:
+        # Embeddiamo contesto + soluzione insieme: così la ricerca trova la soluzione
+        # sia partendo dalla descrizione del problema sia dal testo della soluzione.
         text = solution["problem_context"] + " " + solution["solution"]
         vector = embed_text(text)
         record = {

@@ -14,6 +14,8 @@ from agno.agent import Agent
 from agno.models.groq import Groq
 
 from debrief.config import MODELS, TEMPERATURE
+# Il resolver ha TRE tool di ricerca (a differenza dell'investigator che ne ha uno):
+# soluzioni verificate, incidenti passati e knowledge base. Li userà in quest'ordine.
 from debrief.tools.search import search_past_incidents, search_knowledge_base, search_verified_solutions
 
 
@@ -59,10 +61,35 @@ def create_resolver_agent() -> Agent:
         model=Groq(id=MODELS["resolver"]),
         description="Propone passi di risoluzione per gli incidenti basandosi su knowledge base e incidenti passati.",
         instructions=RESOLVER_INSTRUCTIONS,
+        # L'ordine della lista riflette la priorità suggerita nel prompt: prima le
+        # soluzioni verificate (più affidabili), poi gli incidenti passati, poi la KB.
         tools=[search_verified_solutions, search_past_incidents, search_knowledge_base],
-        num_history_messages=0,
+        num_history_messages=0,       # ogni run senza memoria della chat (contesto via prompt)
         markdown=True,
     )
+
+
+def build_resolution_prompt(incident_description: str, additional_context: str = "") -> str:
+    """Costruisce il prompt di remediation. Estratto come funzione pura così che
+    sia il percorso bloccante (resolve) sia lo streaming (service layer) usino
+    esattamente lo stesso prompt."""
+    # Prompt base con la descrizione dell'incidente (delimitata = prompt difensivo).
+    prompt = f"""Propose remediation steps for the following incident:
+
+<incident_description>
+{incident_description}
+</incident_description>"""
+
+    # `+=` concatena: se c'è contesto aggiuntivo (es. richiesta dell'utente, output
+    # del triage) lo accodiamo in un blocco separato.
+    if additional_context:
+        prompt += f"""
+
+<additional_context>
+{additional_context}
+</additional_context>"""
+
+    return prompt
 
 
 def resolve(agent: Agent, incident_description: str, additional_context: str = "") -> str:
@@ -76,21 +103,12 @@ def resolve(agent: Agent, incident_description: str, additional_context: str = "
     Returns:
         La risposta dell'agente con i passi di remediation
     """
-    prompt = f"""Propose remediation steps for the following incident:
-
-<incident_description>
-{incident_description}
-</incident_description>"""
-
-    if additional_context:
-        prompt += f"""
-
-<additional_context>
-{additional_context}
-</additional_context>"""
+    prompt = build_resolution_prompt(incident_description, additional_context)
 
     try:
+        # L'agente cerca nelle tre fonti (chiamando i tool) e propone i passi.
+        # `or ""` garantisce una stringa anche se content fosse None.
         response = agent.run(prompt)
-        return response.content
+        return response.content or ""
     except Exception as e:
         return f"Resolution failed: {e}"

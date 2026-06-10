@@ -33,12 +33,13 @@ debrief/
 │   │   └── retriever.py         # ricerca + soglia
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── app.py               # FastAPI app
-│   │   ├── routes_incidents.py  # CRUD incidenti
+│   │   ├── app.py               # FastAPI app (lifespan, CORS, router, /health)
+│   │   ├── service.py           # macchina a stati + lifecycle + chat streaming + learning loop
+│   │   ├── routes_incidents.py  # CRUD incidenti + resolve/archive/reopen
 │   │   ├── routes_chat.py       # chat con SSE streaming
-│   │   ├── routes_metrics.py    # MTTR, uptime, conteggi
-│   │   └── routes_auth.py       # login/register
-│   └── auth.py                  # hashing password, token, user CRUD
+│   │   ├── routes_metrics.py    # MTTR, conteggi
+│   │   └── routes_auth.py       # register/login/logout/me
+│   └── auth.py                  # hashing bcrypt, token di sessione, current_user
 ├── seed/
 │   ├── incidents.json           # incidenti mock con cluster
 │   ├── verified_solutions.json  # soluzioni umane di esempio
@@ -206,19 +207,20 @@ Segnare in `cluster_map.json` per la ground truth del retrieval.
 
 ## Checklist di sviluppo
 
-- [ ] Scheletro repo + `uv sync`
-- [ ] Seed: scrivere `incidents.json` con cluster + `cluster_map.json`
-- [ ] Seed: `teams.json`, `verified_solutions.json`, runbook markdown
-- [ ] Seed: `run_seed.py` (popola SQLite + LanceDB)
-- [ ] Embedding: caricamento modello locale, funzione `embed(text)`
-- [ ] RAG retriever: `search(collection, query, k, threshold)` con soglia
-- [ ] Agente triage: system prompt + output TriageOutput + validazione
-- [ ] Agente investigator: system prompt + grounded + provenance
-- [ ] Agente resolver: system prompt + ibrido + escalation HITL + cattura VerifiedSolution
-- [ ] Orchestratore: routing LLM su modello piccolo
-- [ ] API: CRUD incidenti + endpoint metriche
-- [ ] API: chat con SSE streaming
-- [ ] API: auth (register/login, hashing bcrypt)
+- [x] Scheletro repo + `uv sync`
+- [x] Seed: scrivere `incidents.json` con cluster + `cluster_map.json`
+- [x] Seed: `teams.json`, `verified_solutions.json`, runbook markdown
+- [x] Seed: `run_seed.py` (popola SQLite + LanceDB)
+- [x] Embedding: caricamento modello locale, funzione `embed(text)`
+- [x] RAG retriever: `search(collection, query, k, threshold)` con soglia
+- [x] Agente triage: system prompt + output TriageOutput + validazione
+- [x] Agente investigator: system prompt + grounded + provenance
+- [x] Agente resolver: system prompt + ibrido + escalation HITL + cattura VerifiedSolution
+- [x] Orchestratore: routing LLM su modello piccolo
+- [x] API: CRUD incidenti + endpoint metriche
+- [x] API: chat con SSE streaming
+- [x] API: auth (register/login, hashing bcrypt)
+- [x] Service layer: macchina a stati + lifecycle + learning loop (`api/service.py`)
 - [ ] Eval: dataset di test (triage, routing, retrieval, injection)
 - [ ] Eval: `run_eval.py` con metriche per agente
 - [ ] Frontend: dashboard + dettaglio incidente + chat (3 schermate)

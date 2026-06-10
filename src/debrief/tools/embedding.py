@@ -1,21 +1,29 @@
 """
 embedding.py - Embedding locale con sentence-transformers.
 
-Calcola i vettori per la ricerca semantica.
+"Embedding" = trasformare un testo in un vettore di numeri (una lista di float)
+che ne rappresenta il SIGNIFICATO. Testi con senso simile producono vettori
+vicini nello spazio: è questo che permette la ricerca "semantica" (per concetto,
+non per parole esatte).
+
 Tutto avviene in locale, senza usare API, costi aggiuntivi, o rate limit.
 """
 
 import os
 from sentence_transformers import SentenceTransformer
 
-# Il modello viene caricato UNA volta e riusato.
-# La prima volta scarica ~80MB, poi usa la cache locale.
+# Il modello viene caricato UNA volta e riusato (pattern "singleton").
+# Caricare il modello è lento; tenerlo in questa variabile globale evita di
+# ricaricarlo a ogni chiamata. La prima volta scarica ~80MB, poi usa la cache.
 _model = None
 
 
 def get_model() -> SentenceTransformer:
-    """Carica il modello di embedding."""
+    """Carica il modello di embedding (una sola volta)."""
+    # `global _model` dice a Python: dentro questa funzione voglio MODIFICARE la
+    # variabile globale _model, non crearne una locale con lo stesso nome.
     global _model
+    # Carichiamo solo se non è ancora stato caricato (lazy loading).
     if _model is None:
         model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
         print(f"🔵 Loading embedding model: {model_name}...")
@@ -27,19 +35,26 @@ def get_model() -> SentenceTransformer:
 def embed_text(text: str) -> list[float]:
     """Calcola l'embedding di un singolo testo. Restituisce una lista di float."""
     model = get_model()
+    # normalize_embeddings=True → i vettori hanno lunghezza 1. Questo semplifica
+    # il confronto di similarità (vedi indexer.search: la distanza si converte
+    # facilmente in similarità coseno).
     vector = model.encode(text, normalize_embeddings=True)
+    # encode restituisce un array NumPy; .tolist() lo converte in una normale
+    # lista Python, più comoda da serializzare e salvare.
     return vector.tolist()
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """Calcola gli embedding di più testi in batch (più efficiente)."""
+    # Passare TUTTI i testi insieme è molto più veloce che chiamare embed_text in
+    # un loop: il modello li elabora in parallelo. Usato dal seed.
     model = get_model()
     vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=True)
     return vectors.tolist()
 
 
-# Test rapido se esegui il file direttamente
+# Test rapido se esegui il file direttamente (vedi nota su __main__ in database.py).
 if __name__ == "__main__":
     test = embed_text("PLC fermo in produzione, linea bloccata")
     print(f"🟢 Embedding computed: {len(test)} dimensions")
-    print(f"First 5 values: {test[:5]}")
+    print(f"First 5 values: {test[:5]}")   # test[:5] = i primi 5 elementi (slicing)

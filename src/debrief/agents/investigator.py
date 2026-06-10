@@ -10,6 +10,7 @@ from agno.agent import Agent
 from agno.models.groq import Groq
 
 from debrief.config import MODELS, TEMPERATURE
+# Importiamo il tool di ricerca: lo passeremo all'agente, che potrà chiamarlo da solo.
 from debrief.tools.search import search_past_incidents
 
 
@@ -38,36 +39,54 @@ def create_investigator_agent() -> Agent:
         model=Groq(id=MODELS["investigator"]),
         description="Cerca incidenti simili nel database e identifica pattern ricorrenti.",
         instructions=INVESTIGATOR_INSTRUCTIONS,
+        # tools = lista di funzioni che l'agente può invocare autonomamente. Qui
+        # gli diamo SOLO la ricerca sugli incidenti passati: è il suo unico potere.
         tools=[search_past_incidents],
+        # num_history_messages=0 → ogni run è "senza memoria" della chat precedente.
+        # Il contesto necessario glielo passiamo esplicitamente nel prompt; questo
+        # rende il comportamento più prevedibile e riduce i token.
         num_history_messages=0,
-        markdown=True,
+        markdown=True,                # la risposta è formattata in Markdown
     )
 
 
-def investigate(agent: Agent, question: str, incident_context: str = "") -> str:
-    """Esegue un'indagine.
-    
-    Args:
-        agent: L'investigator agent
-        question: La domanda dell'utente (es. "è già successo?")
-        incident_context: Contesto dell'incidente corrente (opzionale)
-    
-    Returns:
-        La risposta dell'agente come stringa
-    """
-    # Costruisci il prompt con il contesto dell'incidente
+def build_investigation_prompt(question: str, incident_context: str = "") -> str:
+    """Costruisce il prompt di indagine. Estratto come funzione pura così che
+    sia il percorso bloccante (investigate) sia lo streaming (service layer)
+    usino esattamente lo stesso prompt."""
+    # Se abbiamo il contesto dell'incidente, lo includiamo (delimitato) prima della
+    # domanda. Altrimenti passiamo solo la domanda. Stesso prompt sia per la via
+    # bloccante (investigate) sia per lo streaming → comportamento identico.
     if incident_context:
-        prompt = f"""Current incident context:
+        return f"""Current incident context:
 <incident_description>
 {incident_context}
 </incident_description>
 
 User question: {question}"""
-    else:
-        prompt = question
+    return question
+
+
+def investigate(agent: Agent, question: str, incident_context: str = "") -> str:
+    """Esegue un'indagine.
+
+    Args:
+        agent: L'investigator agent
+        question: La domanda dell'utente (es. "è già successo?")
+        incident_context: Contesto dell'incidente corrente (opzionale)
+
+    Returns:
+        La risposta dell'agente come stringa
+    """
+    prompt = build_investigation_prompt(question, incident_context)
 
     try:
+        # run() bloccante: l'agente eventualmente chiama il tool di ricerca, poi
+        # restituisce la risposta testuale finale in response.content.
+        # `or ""` garantisce una stringa anche se content fosse None (la funzione
+        # promette di restituire str).
         response = agent.run(prompt)
-        return response.content
+        return response.content or ""
     except Exception as e:
+        # Restituiamo l'errore come stringa così la chat mostra qualcosa invece di crashare.
         return f"Investigation failed: {e}"
