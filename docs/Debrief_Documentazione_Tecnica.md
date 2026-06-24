@@ -216,7 +216,6 @@ Quattro principi si applicano a ogni agente e vengono ripetuti qui una volta sol
 ```python
 class TriageOutput(BaseModel):
     title: str                      # titolo breve e descrittivo
-    category: Category              # enum chiuso (vedi sotto)
     severity: Severity              # enum SEV1..SEV4
     affected_systems: list[str]     # sistemi/servizi impattati
     suggested_teams: list[str]      # SOLO valori dalla tabella team di seed
@@ -226,7 +225,7 @@ class TriageOutput(BaseModel):
     confidence: float               # 0..1, auto-valutazione
 ```
 
-`Category` e `Severity` sono enum chiusi: il modello non può inventare valori fuori lista, e la validazione li rifiuta. `suggested_teams` viene **validato** contro la tabella dei team di seed — un team inventato viene scartato. Questo è un punto di validazione I/O concreto.
+`Severity` è un enum chiuso: il modello non può inventare valori fuori lista, e la validazione li rifiuta. `suggested_teams` viene **validato** contro la tabella dei team di seed — un team inventato viene scartato. Questo è un punto di validazione I/O concreto.
 
 **Scala di severità (SEV1–SEV4, standard di settore).**
 

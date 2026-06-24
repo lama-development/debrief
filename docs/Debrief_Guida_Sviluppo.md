@@ -25,7 +25,6 @@ debrief/
 │   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── search.py            # search_past_incidents, search_kb, search_verified
-│   │   ├── db_read.py           # get_teams_catalog, get_incident_timeline
 │   │   └── embedding.py         # sentence-transformers locale
 │   ├── rag/
 │   │   ├── __init__.py
@@ -71,18 +70,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-class Category(str, Enum):
-    INFRASTRUCTURE = "infrastructure"
-    APPLICATION = "application"
-    DATABASE = "database"
-    NETWORK = "network"
-    SECURITY = "security"
-    DEPLOYMENT = "deployment"
-    HARDWARE = "hardware"        # PLC, macchinari
-    HELPDESK = "helpdesk"        # posta, postazioni
-    THIRD_PARTY = "third_party"
-    OTHER = "other"
-
 class Severity(str, Enum):
     SEV1 = "SEV1"  # critico: linea ferma, impatto su produzione/clienti
     SEV2 = "SEV2"  # alto: degrado significativo
@@ -90,17 +77,12 @@ class Severity(str, Enum):
     SEV4 = "SEV4"  # basso: impatto minimo/cosmetico
 
 class IncidentStatus(str, Enum):
-    DECLARED = "declared"
-    TRIAGE = "triage"
-    AWAITING_DETAILS = "awaiting_details"
-    ACTIVE = "active"
-    IN_RESOLUTION = "in_resolution"
-    RESOLVED = "resolved"
-    ARCHIVED = "archived"
+    OPEN = "open"          # dichiarato / in triage / in attesa di dettagli
+    ACTIVE = "active"      # classificato e in lavorazione (inclusa la risoluzione)
+    RESOLVED = "resolved"  # chiuso (riapribile)
 
 class TriageOutput(BaseModel):
     title: str
-    category: Category
     severity: Severity
     affected_systems: list[str]
     suggested_teams: list[str]       # SOLO valori dal catalogo team
@@ -144,7 +126,7 @@ class RemediationStep(BaseModel):
 
 ```
 users           (id, username, password_hash, created_at)
-incidents       (id, title, description, category, severity, status, created_by, created_at, updated_at, session_id)
+incidents       (id, title, description, severity, status, created_by, created_at, updated_at, session_id)
 timeline_events (id, incident_id, timestamp, event_type, actor, content)
 teams           (id, name, description, contact_info)
 remediation     (id, incident_id, description, completed, source)
@@ -192,18 +174,18 @@ Verifica disponibilità su console.groq.com prima di iniziare. I nomi stanno in 
 
 ## Mappa cluster per il seed
 
-Ogni cluster = 3-4 incidenti dello stesso tipo descritti con parole diverse.
-Segnare in `cluster_map.json` per la ground truth del retrieval.
+Dataset seed compatto: **11 incidenti** che coprono tutti i casi (3 stati + severità
+SEV1-SEV4 + categorie varie). Solo gli incidenti **risolti** finiscono nel RAG; di
+questi, 2 cluster di 3 incidenti simili fanno da ground truth del retrieval
+(`cluster_map.json`). Gli incidenti `active`/`open` mostrano gli altri stati in dashboard.
 
-| Cluster | Categoria | Esempi di varianti |
+| Cluster (risolti) | Categoria | Incidenti |
 |---|---|---|
-| `db_connection_pool` | DATABASE | "pool esaurito", "troppe connessioni", "timeout query sotto carico" |
-| `network_latency` | NETWORK | "latenza anomala", "pacchetti persi", "switch instabile" |
-| `plc_error` | HARDWARE | "PLC fermo linea 2", "errore comunicazione PLC", "allarme macchinario" |
-| `disk_full` | INFRASTRUCTURE | "disco pieno /var", "spazio esaurito DB", "log non ruotati" |
-| `email_client` | HELPDESK | "Outlook non sincronizza", "posta bloccata", "allegati non si aprono" |
-| `deploy_failure` | DEPLOYMENT | "deploy rotto in prod", "rollback fallito", "container non parte" |
-| `vpn_access` | NETWORK | "VPN non si connette", "timeout VPN remoto", "certificato VPN scaduto" |
+| `plc_error` | HARDWARE | INC-001, INC-002, INC-003 |
+| `db_connection_pool` | DATABASE | INC-004, INC-005, INC-006 |
+
+Risolti standalone: INC-007 (infrastructure), INC-008 (network).
+Attivi: INC-009 (helpdesk SEV4), INC-010 (network SEV3). Da classificare: INC-011.
 
 ## Checklist di sviluppo
 
@@ -221,9 +203,9 @@ Segnare in `cluster_map.json` per la ground truth del retrieval.
 - [x] API: chat con SSE streaming
 - [x] API: auth (register/login, hashing bcrypt)
 - [x] Service layer: macchina a stati + lifecycle + learning loop (`api/service.py`)
-- [ ] Eval: dataset di test (triage, routing, retrieval, injection)
-- [ ] Eval: `run_eval.py` con metriche per agente
-- [ ] Frontend: dashboard + dettaglio incidente + chat (3 schermate)
+- [x] Eval: dataset di test (triage, routing, retrieval, injection)
+- [x] Eval: `run_eval.py` con metriche per agente
+- [x] Frontend: dashboard + dettaglio incidente + chat (React + shadcn/ui)
 - [ ] Demo: happy path end-to-end + dimostrazione loop apprendimento
 - [ ] Relazione finale
 
