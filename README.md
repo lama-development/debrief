@@ -1,18 +1,48 @@
+<div align="center">
+  <img src="frontend/public/logo.png" alt="Debrief Logo" width="120" />
+
 # Debrief
 
-_Incident Response Multi-Agent Platform_
+**Incident Response Multi-Agent Platform**
 
-Tre agenti orchestrati da un router LLM gestiscono il ciclo di vita di un incidente:
+[![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-1. **Triage**: classificazione e prioritizzazione;
-2. **Investigator**: ricerca di incidenti simili via RAG;
-3. **Resolver**: remediation e post-mortem automatico.
+</div>
 
-Il sistema impara da ogni incidente risolto e dalle soluzioni fornite dagli umani.
+## Come funziona
+
+Debrief sposta il valore cognitivo del triage dall'essere umano agli agenti: classificazione in linguaggio naturale, recall semantico degli incidenti passati via RAG, e post-mortem generato automaticamente alla chiusura.
+
+### Agenti
+
+| Agente           | Ruolo                                                            |
+| ---------------- | ---------------------------------------------------------------- |
+| **Triage**       | Classifica severity, priorità e team coinvolti dal testo libero  |
+| **Investigator** | Cerca incidenti simili via RAG (embedding semantico)             |
+| **Resolver**     | Propone remediation, traccia la chiusura e genera il post-mortem |
+
+---
+
+## Stack
+
+| Livello               | Tecnologia                                                                 |
+| --------------------- | -------------------------------------------------------------------------- |
+| Orchestrazione agenti | [Agno](https://github.com/agno-agi/agno)                                   |
+| Vector DB             | [LanceDB](https://lancedb.com)                                             |
+| Embedding             | sentence-transformers (locale)                                             |
+| LLM                   | [Groq](https://groq.com)                                                   |
+| Backend               | [FastAPI](https://fastapi.tiangolo.com) + [uv](https://docs.astral.sh/uv/) |
+| Frontend              | [React](https://react.dev) + [shadcn/ui](https://ui.shadcn.com)            |
+| Database              | SQLite                                                                     |
+
+---
 
 ## Quick start
 
-### 1. Clona e installa
+### 1. Clona e configura
 
 ```bash
 git clone https://github.com/lama-development/debrief && cd debrief
@@ -20,13 +50,13 @@ cp .env.example .env
 # Inserisci la tua GROQ_API_KEY in .env
 ```
 
-### 2. Installa dipendenze
+### 2. Installa le dipendenze Python
 
 ```bash
 uv sync
 ```
 
-### 3. Popola il database con i dati di seed
+### 3. Popola il database con dati di seed
 
 ```bash
 uv run python seed/run_seed.py
@@ -34,47 +64,39 @@ uv run python seed/run_seed.py
 
 ### 4. Avvia backend e frontend
 
-Terminale 1 - Backend (porta 8000):
+**Terminale 1** — Backend su `http://localhost:8000`:
 
 ```bash
 uv run dev
 ```
 
-Terminale 2 - Frontend (porta 5173):
+**Terminale 2** — Frontend su `http://localhost:5173`:
 
 ```bash
 cd frontend
-npm install # solo la prima volta
+npm install   # solo la prima volta
 npm run dev
 ```
 
-L'interfaccia è su `http://localhost:5173`. Registra un utente, dichiara un
-incidente e chatta con gli agenti (triage → investigator → resolver). Per
-puntare a un backend diverso, modifica `API_URL` in `frontend/src/lib/api.ts`.
+Apri `http://localhost:5173`, registra un utente, dichiara un incidente e chatta con gli agenti.
 
-### 5. (_opzionale_) Esegui la valutazione
+> [!TIP]
+> Per puntare a un backend diverso, modifica `API_URL` in `frontend/src/lib/api.ts`.
+
+### 5. (Opzionale) Esegui la valutazione
 
 ```bash
 uv run eval
 ```
 
-## Stack
-
-| Livello               | Scelta                         |
-| --------------------- | ------------------------------ |
-| Orchestrazione agenti | Agno                           |
-| Vector DB             | LanceDB                        |
-| Embedding             | sentence-transformers (locale) |
-| LLM                   | Groq (modelli open-source)     |
-| Backend               | FastAPI + uv                   |
-| Frontend              | React + shadcn/ui              |
-| Database              | SQLite                         |
+---
 
 ## Documentazione
 
-La documentazione tecnica completa con le motivazioni architetturali e la valutazione è in `docs/Debrief_Documentazione_Tecnica.md`.
+La documentazione tecnica completa — motivazioni architetturali, scelte di design e valutazione — è in [`docs/Debrief_Documentazione_Tecnica.md`](docs/Debrief_Documentazione_Tecnica.md).
+
+---
 
 ## Autore
 
-Davide La Marca (20054157) -
-Programmazione di Applicazioni Intelligenti
+**Davide La Marca** (20054157) — Programmazione di Applicazioni Intelligenti
