@@ -13,7 +13,7 @@ export function SeverityBadge({ severity, className }: { severity: Severity | nu
           className,
         )}
       >
-        n/d
+        N/A
       </span>
     )
   }
