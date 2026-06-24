@@ -31,6 +31,13 @@ eval = "eval.run_eval:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# I console script `seed` ed `eval` importano i package top-level `seed` ed `eval`.
+# Con il layout src/, hatchling impacchetta in automatico solo `src/debrief`: qui
+# dichiariamo esplicitamente anche `seed` ed `eval` così `uv run seed` / `uv run eval`
+# risolvono l'import. (Richiedono un __init__.py nella rispettiva cartella.)
+[tool.hatch.build.targets.wheel]
+packages = ["src/debrief", "seed", "eval"]
+
 [dependency-groups]
 dev = [
     "httpx",

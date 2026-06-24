@@ -1,0 +1,89 @@
+{
+  "_note": "Dataset di valutazione dell'Orchestrator (router LLM). Ogni caso fornisce il messaggio utente, lo status dell'incidente e una descrizione, e indica quale agente dovrebbe gestirlo. Verifica sia le PHASE RULES del prompt sia il riconoscimento dell'intento. expected_agent in {triage, investigator, resolver, none}.",
+  "cases": [
+    {
+      "id": "ROU-01",
+      "message": "Il server di posta non invia piu' email, restano tutte bloccate nella coda di uscita.",
+      "incident_status": "open",
+      "incident_description": "Segnalazione iniziale dall'ufficio commerciale: la posta in uscita non parte.",
+      "expected_agent": "triage"
+    },
+    {
+      "id": "ROU-02",
+      "message": "Si', il problema riguarda tutti gli utenti e il certificato risulta scaduto ieri sera.",
+      "incident_status": "open",
+      "incident_description": "Nessuno riesce a inviare email; il triage aveva chiesto chiarimenti sull'ambito.",
+      "expected_agent": "triage"
+    },
+    {
+      "id": "ROU-03",
+      "message": "E' gia' successo un problema simile in passato?",
+      "incident_status": "active",
+      "incident_description": "Il PLC della linea 2 e' fermo con errore di comunicazione Profinet.",
+      "expected_agent": "investigator"
+    },
+    {
+      "id": "ROU-04",
+      "message": "Ci sono pattern ricorrenti su questo tipo di guasto al PLC?",
+      "incident_status": "active",
+      "incident_description": "Errore di comunicazione PLC-SCADA sulla linea di estrusione.",
+      "expected_agent": "investigator"
+    },
+    {
+      "id": "ROU-05",
+      "message": "Quali incidenti simili abbiamo gia' avuto con la VPN che non si connette?",
+      "incident_status": "active",
+      "incident_description": "La VPN non si connette per i lavoratori da remoto, errore di timeout.",
+      "expected_agent": "investigator"
+    },
+    {
+      "id": "ROU-06",
+      "message": "Come lo risolviamo? Dammi i passi concreti di remediation.",
+      "incident_status": "active",
+      "incident_description": "Disco del server principale pieno al 100%, servizi di rete bloccati.",
+      "expected_agent": "resolver"
+    },
+    {
+      "id": "ROU-07",
+      "message": "Genera il post-mortem dell'incidente ora che e' stato sistemato.",
+      "incident_status": "active",
+      "incident_description": "Certificato SSL della VPN scaduto, poi rinnovato.",
+      "expected_agent": "resolver"
+    },
+    {
+      "id": "ROU-08",
+      "message": "Quali sono i prossimi passi per chiudere l'incidente?",
+      "incident_status": "active",
+      "incident_description": "Connection pool del database saturo durante la chiusura mensile.",
+      "expected_agent": "resolver"
+    },
+    {
+      "id": "ROU-09",
+      "message": "Perfetto, grazie mille per l'aiuto!",
+      "incident_status": "resolved",
+      "incident_description": "Outlook non sincronizzava la posta su piu' postazioni, ora risolto.",
+      "expected_agent": "none"
+    },
+    {
+      "id": "ROU-10",
+      "message": "ok",
+      "incident_status": "resolved",
+      "incident_description": "Stampante etichette con testina usurata, sostituita e archiviato.",
+      "expected_agent": "none"
+    },
+    {
+      "id": "ROU-11",
+      "message": "Classifica questo problema e dimmi quanto e' grave: la stampante di etichette stampa illeggibile.",
+      "incident_status": "open",
+      "incident_description": "Nuova segnalazione dalla zona imballaggio.",
+      "expected_agent": "triage"
+    },
+    {
+      "id": "ROU-12",
+      "message": "Buongiorno",
+      "incident_status": "resolved",
+      "incident_description": "Incidente VPN gia' chiuso la settimana scorsa.",
+      "expected_agent": "none"
+    }
+  ]
+}

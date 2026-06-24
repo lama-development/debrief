@@ -53,7 +53,6 @@ def main():
     # Mostra il risultato
     print("🟢 Triage completed!\n")
     print(f"   Title:       {result.title}")
-    print(f"   Category:    {result.category.value}")
     print(f"   Severity:    {result.severity.value}")
     print(f"   Confidence:  {result.confidence:.0%}")
     print(f"   Systems:     {', '.join(result.affected_systems) if result.affected_systems else '-'}")

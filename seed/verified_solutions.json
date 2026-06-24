@@ -1,7 +1,7 @@
 [
   {
     "id": "VS-001",
-    "incident_id": "INC-009",
+    "incident_id": "INC-001",
     "problem_context": "PLC in blocco di sicurezza per sonda di temperatura difettosa che legge valori fuori range. Allarme non resettabile dal pannello operatore.",
     "solution": "Verificare la temperatura reale con un termometro esterno. Se nella norma, la sonda è difettosa. Contattare il fornitore PLC per autorizzazione al bypass temporaneo della sonda nel programma PLC (parametro S7.TempBypass = 1). Ordinare la sonda sostitutiva. NON bypassare senza autorizzazione del fornitore.",
     "provided_by": "davide.lamarca",
@@ -9,7 +9,7 @@
   },
   {
     "id": "VS-002",
-    "incident_id": "INC-011",
+    "incident_id": "INC-007",
     "problem_context": "Server con disco pieno al 100%, servizi bloccati, impossibile accedere via RDP. Causa tipica: log o backup non ruotati.",
     "solution": "Accesso fisico al server (RDP non funziona a disco pieno). Aprire cmd come amministratore. Controllare con 'dir /s /o-s C:\\' le cartelle più grandi. Di solito sono i log di Windows in C:\\Windows\\System32\\winevt\\Logs o i temp in C:\\Windows\\Temp. Cancellare i log più vecchi di 30 giorni. Dopo aver liberato spazio, configurare la rotazione automatica e un alert all'80% di occupazione.",
     "provided_by": "davide.lamarca",
@@ -17,7 +17,7 @@
   },
   {
     "id": "VS-003",
-    "incident_id": "INC-010",
+    "incident_id": "INC-003",
     "problem_context": "PLC con programma corrotto dopo interruzione di corrente. Display mostra 'Program Error - Checksum Mismatch'. Batteria di backup scarica.",
     "solution": "Non tentare il reset: il programma è perso. Contattare immediatamente il fornitore PLC. Servirà il backup del programma (verificare che esista in \\\\server\\backup_plc\\). Se il backup è vecchio, dopo il caricamento bisogna ricalibrate i parametri modificati nel frattempo con il capoturno. Sostituire la batteria di backup (codice: Siemens 6ES7971-0BA00). Programmare backup mensili.",
     "provided_by": "davide.lamarca",
@@ -25,7 +25,7 @@
   },
   {
     "id": "VS-004",
-    "incident_id": "INC-022",
+    "incident_id": "INC-008",
     "problem_context": "Certificato SSL scaduto su un servizio critico (VPN, posta, web). Nessun utente può connettersi. Errore di validazione certificato.",
     "solution": "Verificare la scadenza del certificato con 'openssl s_client -connect server:portà. Se scaduto, rinnovare: per Let's Encrypt usare certbot renew, per certificati commerciali contattare il fornitore. Dopo il rinnovo, riavviare il servizio. Impostare SEMPRE un reminder nel calendario condiviso IT a 90, 30 e 7 giorni dalla scadenza di ogni certificato. Tenere un foglio Excel con tutti i certificati e le relative scadenze.",
     "provided_by": "davide.lamarca",

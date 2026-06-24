@@ -43,7 +43,6 @@ def run_test(message: str, status: str, description: str = INCIDENT_DESCRIPTION,
 
     if triage_output:
         print(f"   Title:    {triage_output.title}")
-        print(f"   Category: {triage_output.category.value}")
         print(f"   Severity: {triage_output.severity.value}")
         print(f"   Teams:    {', '.join(triage_output.suggested_teams) or 'none'}")
         print(f"   Needs clarification: {triage_output.needs_clarification}")
@@ -54,7 +53,7 @@ def run_test(message: str, status: str, description: str = INCIDENT_DESCRIPTION,
         print()
         print(response)
     else:
-        print("🔵 (no response — NONE agent)")
+        print("🔵 (no response - NONE agent)")
     print()
 
 
@@ -76,7 +75,7 @@ def main():
     # Test 1: incident declaration → TRIAGE expected
     run_test(
         message=INCIDENT_DESCRIPTION,
-        status="declared",
+        status="open",
         label="Test 1: Incident declaration (→ TRIAGE)",
     )
 
@@ -90,7 +89,7 @@ def main():
     # Test 3: ask for resolution → RESOLVER expected
     run_test(
         message="Come risolvo questo problema? Cosa devo fare?",
-        status="in_resolution",
+        status="active",
         label="Test 3: Resolution request (→ RESOLVER)",
     )
 
@@ -105,7 +104,7 @@ def main():
     # Test 5: vague description → TRIAGE with clarification expected
     run_test(
         message="Ho un problema.",
-        status="declared",
+        status="open",
         description="Ho un problema.",
         label="Test 5: Vague description (→ TRIAGE + clarification)",
     )

@@ -32,11 +32,33 @@ uv sync
 uv run python seed/run_seed.py
 ```
 
-### 4. Avvia il backend
+### 4. Avvia backend e frontend
+
+Un solo comando avvia entrambi (e installa le dipendenze del frontend la prima volta):
+
+```powershell
+.\dev.ps1
+```
+
+Si aprono due finestre: **Backend** su `http://127.0.0.1:8000` e **Frontend** su
+`http://localhost:5173`. Ferma ciascun servizio con `Ctrl+C` nella sua finestra.
+
+<details>
+<summary>In alternativa, a mano (due terminali)</summary>
 
 ```bash
-uv run uvicorn src.debrief.api.app:app --reload
+uv run dev            # terminale 1: backend (porta 8000)
+
+cd frontend           # terminale 2: frontend (porta 5173)
+npm install           # solo la prima volta
+npm run dev
 ```
+
+</details>
+
+L'interfaccia è su `http://localhost:5173`. Registra un utente, dichiara un
+incidente e chatta con gli agenti (triage → investigator → resolver). Per
+puntare a un backend diverso, modifica `API_URL` in `frontend/src/lib/api.ts`.
 
 ### 5. (_opzionale_) Esegui la valutazione
 

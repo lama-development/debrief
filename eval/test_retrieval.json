@@ -1,0 +1,18 @@
+{
+  "_note": "Dataset di valutazione del retrieval RAG (collezione past_incidents). La ground truth è cluster_map.json: per ogni query, i relevant_ids sono i membri del cluster corrispondente. Le query sono riformulazioni NON copiate dagli incidenti del seed. Solo gli incidenti risolti sono nel RAG; quelli non appartenenti al cluster fungono da distrattori. Metriche: precision@k, recall@k, MRR, hit@1.",
+  "top_k": 5,
+  "cases": [
+    {
+      "id": "RET-01",
+      "cluster": "plc_error",
+      "query": "Il PLC di una linea è andato in errore di comunicazione e ha fermato il macchinario in produzione.",
+      "relevant_ids": ["INC-001", "INC-002", "INC-003"]
+    },
+    {
+      "id": "RET-02",
+      "cluster": "db_connection_pool",
+      "query": "Il database è saturo di connessioni aperte e le query vanno in timeout quando il carico aumenta.",
+      "relevant_ids": ["INC-004", "INC-005", "INC-006"]
+    }
+  ]
+}
