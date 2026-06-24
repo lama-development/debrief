@@ -19,7 +19,8 @@ export function AppHeader() {
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
       <div className="container flex h-14 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 font-semibold">
-          <img src="/favicon.svg" alt="" className="h-5 w-5" />
+          <img src="/Debrief-Light.png" alt="" className="h-6 dark:hidden" />
+          <img src="/Debrief-Dark.png" alt="" className="h-6 hidden dark:block" />
           Debrief
         </Link>
         <div className="flex items-center gap-3">
