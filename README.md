@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/public/logo.png" alt="Debrief Logo" width="120" />
+  <img src="frontend/public/Debrief-Light.png" alt="Debrief Logo" width="120" />
 
 # Debrief
 
