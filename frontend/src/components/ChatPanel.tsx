@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Bot, Loader2, Search, Send, User as UserIcon } from "lucide-react"
 import { toast } from "sonner"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 import { TriageCard } from "@/components/TriageCard"
 import { Button } from "@/components/ui/button"
@@ -8,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { streamChat } from "@/lib/chat"
 import { ApiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { getAgentIdentity } from "@/lib/agents"
 import type { ChatEvent, IncidentStatus, TimelineEvent, TriageData } from "@/lib/types"
 
 interface ChatMessage {
@@ -19,12 +22,6 @@ interface ChatMessage {
 }
 
 const ASSISTANT_ACTORS = new Set(["triage", "investigator", "resolver"])
-const AGENT_LABEL: Record<string, string> = {
-  triage: "Triage",
-  investigator: "Investigator",
-  resolver: "Resolver",
-  none: "Sistema",
-}
 const CLOSED_STATUSES: IncidentStatus[] = ["resolved"]
 
 // Costruisce la cronologia iniziale della chat dagli eventi di timeline.
@@ -155,9 +152,9 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       {/* Cronologia */}
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 pb-24">
         {messages.length === 0 && (
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Invia un messaggio per avviare il triage dell'incidente.
@@ -167,76 +164,84 @@ export function ChatPanel({
           <MessageBubble key={m.id} message={m} />
         ))}
         {activeTool && (
-          <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 pl-10 text-sm text-muted-foreground">
             <Search className="h-3.5 w-3.5 animate-pulse" /> ricerca in corso ({activeTool})…
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <form onSubmit={onSubmit} className="border-t p-3">
-        {closed ? (
-          <p className="text-center text-sm text-muted-foreground">
-            Incidente chiuso. Riaprilo per continuare la conversazione.
-          </p>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                // Invio = invia, Shift+Invio = a capo.
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  void send()
-                }
-              }}
-              placeholder="Scrivi un messaggio…"
-              rows={2}
-              className="min-h-[44px] resize-none"
-              disabled={streaming}
-            />
-            <Button type="submit" size="icon" className="shrink-0" disabled={streaming || !input.trim()}>
-              {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
-        )}
-      </form>
+      {/* Input floating */}
+      <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8 bg-gradient-to-t from-background via-background/80 via-60% to-transparent">
+        <form onSubmit={onSubmit}>
+          {closed ? (
+            <p className="text-center text-sm text-muted-foreground py-1">
+              Incidente chiuso. Riaprilo per continuare la conversazione.
+            </p>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border bg-background/80 shadow-lg px-3 py-2">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    void send()
+                  }
+                }}
+                placeholder="Scrivi un messaggio…"
+                rows={1}
+                className="min-h-[32px] resize-none border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent p-0"
+                disabled={streaming}
+              />
+              <Button type="submit" size="icon" className="shrink-0 h-8 w-8" disabled={streaming || !input.trim()}>
+                {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          )}
+        </form>
+      </div>
     </div>
   )
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
+  const identity = getAgentIdentity(message.agent)
   return (
     <div className={cn("flex gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
       <span
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset",
-          isUser
-            ? "bg-primary text-primary-foreground ring-primary/20"
-            : "bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:ring-sky-500/30",
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+          isUser ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/20" : identity.iconCls,
         )}
       >
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </span>
       <div className={cn("max-w-[80%] space-y-2", isUser ? "items-end text-right" : "items-start")}>
         {!isUser && message.agent && (
-          <div className="text-xs font-medium text-muted-foreground">
-            {AGENT_LABEL[message.agent] ?? message.agent}
+          <div className="text-sm font-medium text-muted-foreground">
+            {identity.label}
           </div>
         )}
         {message.triage && <TriageCard data={message.triage} />}
         {message.content && (
           <div
             className={cn(
-              "inline-block whitespace-pre-wrap rounded-xl px-3 py-2 text-sm shadow-sm",
+              "inline-block rounded-lg px-3 py-2 text-sm shadow-sm",
               isUser
-                ? "bg-primary text-primary-foreground"
-                : "border border-border bg-secondary/80 text-foreground dark:bg-secondary/60",
+                ? "whitespace-pre-wrap bg-primary/15 text-foreground border border-primary/30"
+                : identity.bubbleCls,
             )}
           >
-            {message.content}
+            {isUser ? (
+              message.content
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-pre:my-1 prose-code:text-sm">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ import {
 
 import { formatDateTime } from "@/lib/labels"
 import { cn } from "@/lib/utils"
+import { AGENT_IDENTITY, DECLARED_CLS } from "@/lib/agents"
 import type { TimelineEvent } from "@/lib/types"
 
 // Un milestone è un FATTO saliente del ciclo di vita (non un messaggio di chat).
@@ -35,7 +36,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
         time: ev.timestamp,
         label: "Incidente dichiarato",
         icon: Flag,
-        cls: "text-slate-500",
+        cls: DECLARED_CLS,
       })
       return
     }
@@ -46,7 +47,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           time: ev.timestamp,
           label: "Classificato dal triage",
           icon: ClipboardCheck,
-          cls: "text-blue-600",
+          cls: AGENT_IDENTITY.triage.timelineCls,
         })
         break
       case "involvement":
@@ -56,7 +57,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           label: "Team coinvolto",
           detail: ev.content ?? undefined,
           icon: Users,
-          cls: "text-amber-600",
+          cls: AGENT_IDENTITY.triage.timelineCls,
         })
         break
       case "escalation":
@@ -65,7 +66,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           time: ev.timestamp,
           label: "Escalation a intervento umano",
           icon: ShieldAlert,
-          cls: "text-orange-600",
+          cls: DECLARED_CLS,
         })
         break
       case "resolution":
@@ -76,7 +77,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
             time: ev.timestamp,
             label: "Soluzione proposta dal resolver",
             icon: Wrench,
-            cls: "text-violet-600",
+            cls: AGENT_IDENTITY.resolver.timelineCls,
           })
         } else {
           out.push({
@@ -84,7 +85,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
             time: ev.timestamp,
             label: "Incidente risolto",
             icon: CheckCircle2,
-            cls: "text-emerald-600",
+            cls: AGENT_IDENTITY.resolver.timelineCls,
           })
         }
         break
@@ -102,25 +103,22 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
   }
 
   return (
-    <ol className="relative space-y-5 before:absolute before:left-[13px] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-border">
+    <ol className="relative space-y-4 before:absolute before:left-[13px] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-border/50">
       {milestones.map((m) => {
         const Icon = m.icon
         return (
-          <li key={m.key} className="relative flex gap-3">
-            <span
-              className={cn(
-                "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-background",
-                m.cls,
-              )}
-            >
-              <Icon className="h-4 w-4" />
+          <li key={m.key} className="relative flex items-center gap-3">
+            <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background">
+              <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border border-current/20", m.cls)}>
+                <Icon className="h-3.5 w-3.5" />
+              </span>
             </span>
-            <div className="pt-0.5">
-              <div className="text-sm font-medium leading-tight">
-                {m.label}
-                {m.detail && <span className="ml-1 font-normal text-muted-foreground">· {m.detail}</span>}
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-medium leading-tight">{m.label}</span>
+                <span className="text-sm text-muted-foreground/70 shrink-0">{formatDateTime(m.time)}</span>
               </div>
-              <div className="text-xs text-muted-foreground">{formatDateTime(m.time)}</div>
+              {m.detail && <p className="text-sm text-muted-foreground mt-0.5">{m.detail}</p>}
             </div>
           </li>
         )

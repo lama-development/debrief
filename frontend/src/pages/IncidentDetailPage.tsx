@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, RotateCcw } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppHeader } from "@/components/AppHeader"
@@ -58,38 +58,38 @@ export function IncidentDetailPage() {
     <div className="flex h-screen flex-col bg-muted/30">
       <AppHeader />
 
-      {/* Intestazione incidente: back + titolo/sottotitolo sulla stessa linea.
-          Niente sfondo: solo un divisore (border-b) verso il contenuto sotto. */}
-      <div className="border-b">
-        <div className="container flex flex-wrap items-center justify-between gap-3 py-4">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="icon" aria-label="Torna alla dashboard">
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-muted-foreground">{incident.id}</span>
-                <StatusBadge status={incident.status} />
-                <SeverityBadge severity={incident.severity} />
+      {/* Intestazione incidente */}
+      <div className="container pt-4">
+        <Card className="px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Torna alla dashboard">
+                <Link to="/">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold tracking-tight">{incident.title}</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <StatusBadge status={incident.status} />
+                  <SeverityBadge severity={incident.severity} />
+                </div>
               </div>
-              <h1 className="text-xl font-semibold tracking-tight">{incident.title}</h1>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {canResolve && <ResolveDialog incidentId={incident.id} />}
+              {isResolved && (
+                <Button variant="outline" onClick={onReopen} disabled={reopen.isPending}>
+                  Riapri
+                </Button>
+              )}
             </div>
           </div>
-          <div className="flex gap-2">
-            {canResolve && <ResolveDialog incidentId={incident.id} />}
-            {isResolved && (
-              <Button variant="outline" onClick={onReopen} disabled={reopen.isPending}>
-                <RotateCcw className="h-4 w-4" /> Riapri
-              </Button>
-            )}
-          </div>
-        </div>
+        </Card>
       </div>
 
       {/* Due pannelli: dettaglio (sinistra) + chat (destra) */}
-      <div className="container grid min-h-0 flex-1 grid-cols-1 gap-4 py-4 lg:grid-cols-2">
+      <div className="container grid min-h-0 flex-1 grid-cols-1 gap-4 py-4 lg:grid-cols-[2fr_3fr]">
         {/* Sinistra: descrizione, timeline, remediation, post-mortem */}
         <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
           <Card>
@@ -115,7 +115,7 @@ export function IncidentDetailPage() {
                       <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                       <div>
                         <span>{step.description}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">[{step.source}]</span>
+                        <span className="ml-2 text-sm text-muted-foreground">[{step.source}]</span>
                       </div>
                     </li>
                   ))}
@@ -136,9 +136,6 @@ export function IncidentDetailPage() {
 
         {/* Destra: chat */}
         <Card className="flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="border-b py-3">
-            <CardTitle className="text-base">Assistente Debrief</CardTitle>
-          </CardHeader>
           <CardContent className="min-h-0 flex-1 p-0">
             <ChatPanel
               key={incident.id}
@@ -167,7 +164,7 @@ function PostMortemCard({ pm }: { pm: PostMortem }) {
         {pm.detection && <Field label="Rilevamento" value={pm.detection} />}
         {pm.resolution_steps && pm.resolution_steps.length > 0 && (
           <div>
-            <div className="mb-1 text-xs font-medium text-muted-foreground">Passi di risoluzione</div>
+            <div className="mb-1 text-sm font-medium text-muted-foreground">Passi di risoluzione</div>
             <ul className="list-inside list-disc space-y-1">
               {pm.resolution_steps.map((s, i) => (
                 <li key={i}>{s}</li>
@@ -177,7 +174,7 @@ function PostMortemCard({ pm }: { pm: PostMortem }) {
         )}
         {pm.action_items && pm.action_items.length > 0 && (
           <div>
-            <div className="mb-1 text-xs font-medium text-muted-foreground">Action item</div>
+            <div className="mb-1 text-sm font-medium text-muted-foreground">Action item</div>
             <ul className="list-inside list-disc space-y-1">
               {pm.action_items.map((s, i) => (
                 <li key={i}>{s}</li>
@@ -193,7 +190,7 @@ function PostMortemCard({ pm }: { pm: PostMortem }) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium text-muted-foreground">{label}</div>
       <p className="whitespace-pre-wrap">{value}</p>
     </div>
   )
