@@ -24,21 +24,17 @@ Debrief sposta il valore cognitivo del triage dall'essere umano agli agenti: cla
 | **Investigator** | Cerca incidenti simili via RAG (embedding semantico)             |
 | **Resolver**     | Propone remediation, traccia la chiusura e genera il post-mortem |
 
----
-
 ## Stack
 
 | Livello               | Tecnologia                                                                 |
 | --------------------- | -------------------------------------------------------------------------- |
-| Orchestrazione agenti | [Agno](https://github.com/agno-agi/agno)                                   |
+| Orchestrazione agenti | [Agno](https://agno.com)                                                   |
 | Vector DB             | [LanceDB](https://lancedb.com)                                             |
 | Embedding             | sentence-transformers (locale)                                             |
 | LLM                   | [Groq](https://groq.com)                                                   |
 | Backend               | [FastAPI](https://fastapi.tiangolo.com) + [uv](https://docs.astral.sh/uv/) |
 | Frontend              | [React](https://react.dev) + [shadcn/ui](https://ui.shadcn.com)            |
 | Database              | SQLite                                                                     |
-
----
 
 ## Quick start
 
@@ -74,7 +70,7 @@ uv run dev
 
 ```bash
 cd frontend
-npm install   # solo la prima volta
+npm install # solo la prima volta
 npm run dev
 ```
 
@@ -89,14 +85,10 @@ Apri `http://localhost:5173`, registra un utente, dichiara un incidente e chatta
 uv run eval
 ```
 
----
-
 ## Documentazione
 
 La documentazione tecnica completa — motivazioni architetturali, scelte di design e valutazione — è in [`docs/Debrief_Documentazione_Tecnica.md`](docs/Debrief_Documentazione_Tecnica.md).
 
----
-
 ## Autore
 
-**Davide La Marca** (20054157) — Programmazione di Applicazioni Intelligenti
+**Davide La Marca** (20054157) — Programmazione di Applicazioni Intelligenti MF0781

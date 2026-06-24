@@ -70,8 +70,11 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
 
   if (res.status === 401) {
-    if (onUnauthorized) onUnauthorized()
-    throw new ApiError(401, "Sessione scaduta. Effettua di nuovo il login.")
+    if (auth) {
+      if (onUnauthorized) onUnauthorized()
+      throw new ApiError(401, "Sessione scaduta. Effettua di nuovo il login.")
+    }
+    throw new ApiError(401, "Username o password non validi.")
   }
 
   if (!res.ok) {
