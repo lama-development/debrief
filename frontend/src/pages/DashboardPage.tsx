@@ -123,7 +123,7 @@ export function DashboardPage() {
                       className="cursor-pointer border-b last:border-b-0 hover:bg-muted/50"
                       onClick={() => navigate(`/incidents/${inc.id}`)}
                     >
-                      <td className={cn(TD, "font-mono text-xs")}>{inc.id}</td>
+                      <td className={cn(TD, "font-mono text-sm")}>{inc.id}</td>
                       <td className={cn(TD, "font-medium")}>{inc.title}</td>
                       <td className={TD}>
                         <SeverityBadge severity={inc.severity} />

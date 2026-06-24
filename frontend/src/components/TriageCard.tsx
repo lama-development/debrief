@@ -14,12 +14,12 @@ export function TriageCard({ data }: { data: TriageData }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <SeverityBadge severity={data.severity} />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           Confidenza {Math.round(data.confidence * 100)}%
         </span>
       </div>
 
-      <dl className="mt-3 space-y-1.5 text-xs">
+      <dl className="mt-3 space-y-1.5 text-sm">
         {data.affected_systems.length > 0 && (
           <div className="flex gap-2">
             <dt className="w-28 shrink-0 text-muted-foreground">Sistemi coinvolti</dt>

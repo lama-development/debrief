@@ -9,7 +9,7 @@ export function SeverityBadge({ severity, className }: { severity: Severity | nu
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground",
+          "inline-flex items-center rounded-full border border-dashed px-2.5 py-0.5 text-sm font-medium text-muted-foreground",
           className,
         )}
       >
@@ -21,7 +21,7 @@ export function SeverityBadge({ severity, className }: { severity: Severity | nu
     <Tooltip content={SEVERITY_TOOLTIP[severity]}>
       <span
         className={cn(
-          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm",
+          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold shadow-sm",
           SEVERITY_CLASS[severity],
           className,
         )}

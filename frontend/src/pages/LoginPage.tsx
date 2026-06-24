@@ -40,7 +40,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <img src="/favicon.svg" alt="" className="mx-auto mb-2 h-12 w-12" />

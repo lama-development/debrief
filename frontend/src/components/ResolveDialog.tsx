@@ -46,10 +46,10 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
       <DialogTrigger asChild>
         <Button>Risolvi</Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Risolvi incidente</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="bg-card shadow-2xl">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="text-xl">Risolvi incidente</DialogTitle>
+          <DialogDescription className="leading-5">
             Riepiloga come è stato risolto. La soluzione verificata (opzionale) verrà
             indicizzata come fonte ad alta priorità per incidenti futuri simili.
           </DialogDescription>
@@ -63,6 +63,8 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Es. Sostituito il modulo di comunicazione Profinet del PLC, ripresa produzione."
               rows={3}
+              className="bg-background"
+              autoFocus
               required
             />
           </div>
@@ -74,6 +76,7 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
               onChange={(e) => setVerified(e.target.value)}
               placeholder="Procedura riutilizzabile da archiviare come soluzione verificata…"
               rows={3}
+              className="bg-background"
             />
           </div>
           <DialogFooter>
