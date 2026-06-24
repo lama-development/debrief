@@ -67,6 +67,11 @@ def main():
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
+    # Nel RAG (past_incidents) finiscono SOLO gli incidenti risolti: sono gli unici
+    # con root_cause e resolution_steps, cioè con qualcosa di utile da recuperare.
+    # Gli incidenti open/active sono "in corso" e non hanno una risoluzione da indicizzare.
+    rag_incidents = [inc for inc in incidents if inc.get("status", "resolved") == "resolved"]
+
     with open(solutions_path, encoding="utf-8") as f:
         solutions = json.load(f)
 
@@ -86,7 +91,7 @@ def main():
             "text": text,
         })
 
-    print(f"🟢 {len(incidents)} incidents, {len(solutions)} solutions, {len(kb_docs)} runbooks ready")
+    print(f"🟢 {len(incidents)} incidents ({len(rag_incidents)} risolti → RAG), {len(solutions)} solutions, {len(kb_docs)} runbooks ready")
 
     # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
     # Il testo indicizzato in LanceDB sarà leggibile e autocontenuto,
@@ -114,7 +119,7 @@ def main():
 
     # Per ogni tipo costruiamo la lista dei testi DA incorporare. Devono coincidere
     # con il testo usato in fase di ricerca (vedi indexer._build_incident_text).
-    incident_texts = [_build_incident_text(inc) for inc in incidents]
+    incident_texts = [_build_incident_text(inc) for inc in rag_incidents]
     solution_texts = [s["problem_context"] + " " + s["solution"] for s in solutions]
     kb_texts = [doc["text"] for doc in kb_docs]
 
@@ -127,7 +132,7 @@ def main():
     # in cui li abbiamo concatenati. Usiamo lo slicing [inizio:fine] e un indice
     # scorrevole `idx`. (Il `;` separa due istruzioni sulla stessa riga.)
     idx = 0
-    incident_vectors = all_vectors[idx:idx + len(incidents)]; idx += len(incidents)
+    incident_vectors = all_vectors[idx:idx + len(rag_incidents)]; idx += len(rag_incidents)
     solution_vectors = all_vectors[idx:idx + len(solutions)]; idx += len(solutions)
     kb_vectors = all_vectors[idx:idx + len(kb_docs)]
 
@@ -139,7 +144,7 @@ def main():
 
     # Ogni funzione index_* crea/sovrascrive la sua collezione e restituisce il
     # numero di record indicizzati.
-    n = index_incidents(db, incidents, incident_vectors)
+    n = index_incidents(db, rag_incidents, incident_vectors)
     print(f"🟢 {n} incidents indexed in 'past_incidents'")
 
     n = index_verified_solutions(db, solutions, solution_vectors)

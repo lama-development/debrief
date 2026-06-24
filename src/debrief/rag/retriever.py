@@ -103,7 +103,7 @@ def index_new_incident(incident: dict) -> None:
     Il record viene appeso alla tabella esistente senza sovrascriverla.
 
     Args:
-        incident: dict con almeno id, title, category, severity, root_cause,
+        incident: dict con almeno id, title, severity, root_cause,
                   resolution_steps (list[str]). 'description' o 'text' per l'embedding.
 
     Raises:
@@ -118,7 +118,6 @@ def index_new_incident(incident: dict) -> None:
         record = {
             "id": incident["id"],
             "title": incident["title"],
-            "category": incident.get("category", "other"),
             "severity": incident.get("severity", "SEV4"),
             "text": text,
             "root_cause": incident.get("root_cause", ""),

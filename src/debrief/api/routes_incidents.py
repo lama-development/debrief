@@ -36,8 +36,8 @@ def _require_incident(incident_id: str) -> dict:
 
 @router.post("", status_code=201)   # 201 Created: una risorsa nuova è stata creata
 def create(body: CreateIncidentRequest, user: dict = Depends(auth.current_user)):
-    """Dichiara un nuovo incidente (stato 'declared'). La classificazione avviene
-    al primo messaggio in chat (il router instrada declared -> triage)."""
+    """Dichiara un nuovo incidente (stato 'open'). La classificazione avviene
+    al primo messaggio in chat (il router instrada open -> triage)."""
     # user["id"] arriva dalla dependency: l'incidente è legato a chi lo dichiara.
     return service.create_incident(body.description, user["id"])
 
@@ -68,17 +68,6 @@ def resolve(incident_id: str, body: ResolveRequest, user: dict = Depends(auth.cu
         )
     except ValueError as e:
         # Il service solleva ValueError se la transizione di stato non è valida → 409.
-        raise HTTPException(status_code=409, detail=str(e))
-
-
-@router.post("/{incident_id}/archive")
-def archive(incident_id: str, user: dict = Depends(auth.current_user)):
-    """Archivia un incidente risolto."""
-    # Stesso schema di resolve: 404 se non esiste, 409 se la transizione non è valida.
-    _require_incident(incident_id)
-    try:
-        return service.archive_incident(incident_id)
-    except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
 

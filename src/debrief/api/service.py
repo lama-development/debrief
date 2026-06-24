@@ -42,21 +42,19 @@ from debrief.tools.embedding import embed_text
 # {stato_di_partenza: stato_di_arrivo}. Se lo stato corrente non è tra le chiavi
 # interne, la transizione semplicemente non avviene (vedi advance_status).
 # evento -> {stato_di_partenza: stato_di_arrivo}
+# Ciclo di vita a 3 stati: open -> active -> resolved (riapribile).
 TRANSITIONS: dict[str, dict[str, str]] = {
-    "TRIAGE_CLASSIFIED":          {"declared": "active", "awaiting_details": "active"},
-    "TRIAGE_NEEDS_CLARIFICATION": {"declared": "awaiting_details", "awaiting_details": "awaiting_details"},
-    "RESOLUTION_STARTED":         {"active": "in_resolution", "awaiting_details": "in_resolution",
-                                "in_resolution": "in_resolution"},
-    "RESOLVED":                   {"active": "resolved", "in_resolution": "resolved",
-                                "awaiting_details": "resolved"},
-    "ARCHIVED":                   {"resolved": "archived"},
+    "TRIAGE_CLASSIFIED":          {"open": "active"},
+    "TRIAGE_NEEDS_CLARIFICATION": {"open": "open"},        # resta aperto in attesa di dettagli
+    "RESOLUTION_STARTED":         {"open": "active", "active": "active"},
+    "RESOLVED":                   {"open": "resolved", "active": "resolved"},
     "REOPENED":                   {"resolved": "active"},
 }
 
 # Eventi prodotti automaticamente dall'attività degli agenti (durante la chat).
 AUTOMATIC_EVENTS = {"TRIAGE_CLASSIFIED", "TRIAGE_NEEDS_CLARIFICATION", "RESOLUTION_STARTED"}
 # Eventi che richiedono un'azione esplicita dell'utente/API (mai dalla chat).
-EXPLICIT_EVENTS = {"RESOLVED", "ARCHIVED", "REOPENED"}
+EXPLICIT_EVENTS = {"RESOLVED", "REOPENED"}
 
 
 def advance_status(current: str, event: str) -> str:
@@ -184,7 +182,7 @@ def _stream_triage(incident_id: str, message: str):
 
     # Persisti la classificazione prodotta dal triage. .value estrae la stringa dall'Enum.
     db.update_incident_classification(
-        incident_id, triage.title, triage.category.value, triage.severity.value
+        incident_id, triage.title, triage.severity.value
     )
     # Un evento di timeline per ogni team coinvolto (tracciabilità).
     for team_id in triage.suggested_teams:
@@ -207,12 +205,12 @@ def _stream_investigator(incident_id: str, message: str, description: str):
 
 
 def _stream_resolver(incident_id: str, message: str, description: str):
-    """Resolver: prosa, token streaming reale. Porta lo stato a in_resolution."""
+    """Resolver: prosa, token streaming reale. Garantisce lo stato 'active'."""
     agent = create_resolver_agent()
     prompt = build_resolution_prompt(description, f"User request: {message}")
     full = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "resolution", "resolver", full)
-    return "RESOLUTION_STARTED"   # proporre una soluzione porta a 'in_resolution'
+    return "RESOLUTION_STARTED"   # proporre una soluzione assicura lo stato 'active'
 
 
 def _stream_agent_prose(agent, prompt: str):
@@ -256,10 +254,10 @@ def _stream_agent_prose(agent, prompt: str):
 # ---------------------------------------------------------------------------
 
 def create_incident(description: str, created_by: str) -> dict:
-    """Crea un incidente in stato 'declared'. La classificazione (triage) NON
-    avviene qui: il client apre la chat con la descrizione come primo messaggio,
-    e il router (declared -> triage) la classifica. Così tutto il lavoro degli
-    agenti passa da un unico percorso (stream_chat)."""
+    """Crea un incidente in stato 'open'. La classificazione (triage) NON avviene
+    qui: il client apre la chat con la descrizione come primo messaggio, e il
+    router (open -> triage) la classifica. Così tutto il lavoro degli agenti passa
+    da un unico percorso (stream_chat)."""
     return db.create_incident(description, created_by)
 
 
@@ -327,18 +325,13 @@ def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str
     return updated
 
 
-# archive_incident e reopen_incident sono "scorciatoie": delegano entrambe alla
-# stessa logica generica, passando solo il nome dell'evento. Evita codice duplicato.
-def archive_incident(incident_id: str) -> dict:
-    return _explicit_transition(incident_id, "ARCHIVED")
-
-
+# reopen_incident delega alla logica generica di transizione esplicita.
 def reopen_incident(incident_id: str) -> dict:
     return _explicit_transition(incident_id, "REOPENED")
 
 
 def _explicit_transition(incident_id: str, event: str) -> dict:
-    """Applica un evento esplicito (ARCHIVED/REOPENED) con guardia di transizione."""
+    """Applica un evento esplicito (REOPENED) con guardia di transizione."""
     incident = db.get_incident(incident_id)
     if incident is None:
         raise ValueError(f"Incident {incident_id} not found")
@@ -359,7 +352,6 @@ def get_metrics() -> dict:
     return {
         "by_status": by_status,
         "by_severity": db.count_by_column("severity"),
-        "by_category": db.count_by_column("category"),
         "mttr_seconds": db.mttr_seconds(),
         # sum(dict.values()) somma tutti i conteggi → totale incidenti.
         "total": sum(by_status.values()),
@@ -421,7 +413,6 @@ def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
     inc_for_index = {
         "id": incident["id"],
         "title": incident["title"],
-        "category": incident.get("category") or "",
         "severity": incident.get("severity") or "",
         "description": incident["description"],
         "root_cause": "",

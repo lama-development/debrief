@@ -9,7 +9,7 @@ struttura precisa, altrimenti viene scartato.
 """
 
 # `Enum` = enumerazione: un insieme chiuso di valori ammessi (come un menu a
-# tendina). Impedisce valori arbitrari: una Category può essere SOLO una di queste.
+# tendina). Impedisce valori arbitrari: una Severity può essere SOLO una di queste.
 from enum import Enum
 from datetime import datetime
 # BaseModel = la classe base di ogni schema. Field = serve a dare regole extra a
@@ -19,21 +19,8 @@ from pydantic import BaseModel, Field
 
 # Enum
 # Ereditare sia da `str` che da `Enum` (str, Enum) rende ogni valore al tempo
-# stesso una stringa: comodo perché si serializza in JSON come testo ("database")
+# stesso una stringa: comodo perché si serializza in JSON come testo ("SEV1")
 # invece che come oggetto Python.
-class Category(str, Enum):
-    INFRASTRUCTURE = "infrastructure"
-    APPLICATION = "application"
-    DATABASE = "database"
-    NETWORK = "network"
-    SECURITY = "security"
-    DEPLOYMENT = "deployment"
-    HARDWARE = "hardware"
-    HELPDESK = "helpdesk"
-    THIRD_PARTY = "third_party"
-    OTHER = "other"
-
-
 class Severity(str, Enum):
     # Scala di gravità: SEV1 = critico, SEV4 = basso impatto.
     SEV1 = "SEV1"
@@ -43,15 +30,13 @@ class Severity(str, Enum):
 
 
 class IncidentStatus(str, Enum):
-    # Gli stati possibili di un incidente: è la "macchina a stati" del ciclo di
-    # vita (dichiarato -> triage -> attivo -> in risoluzione -> risolto -> archiviato).
-    DECLARED = "declared"
-    TRIAGE = "triage"
-    AWAITING_DETAILS = "awaiting_details"
+    # Ciclo di vita semplificato a 3 stati:
+    #   open    -> appena dichiarato / in triage / in attesa di dettagli
+    #   active  -> classificato e in lavorazione (inclusa la proposta di risoluzione)
+    #   resolved-> chiuso (stato terminale, riapribile)
+    OPEN = "open"
     ACTIVE = "active"
-    IN_RESOLUTION = "in_resolution"
     RESOLVED = "resolved"
-    ARCHIVED = "archived"
 
 
 class AgentRole(str, Enum):
@@ -67,8 +52,7 @@ class TriageOutput(BaseModel):
     """Output del triage agent. Validato prima della scrittura nel DB."""
     # Ogni riga è un campo con il suo tipo. Senza "= valore" il campo è OBBLIGATORIO.
     title: str
-    category: Category        # deve essere uno dei valori dell'Enum Category
-    severity: Severity        # idem per Severity
+    severity: Severity        # deve essere uno dei valori dell'Enum Severity
     # `list[str]` = lista di stringhe. "= []" la rende opzionale, con lista vuota
     # come default. (Nota: in Pydantic v2 i default mutabili come [] sono gestiti
     # in modo sicuro, ogni istanza ottiene la propria lista.)

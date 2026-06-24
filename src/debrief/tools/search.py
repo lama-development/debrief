@@ -51,7 +51,7 @@ def search_past_incidents(query: str) -> str:
             # r.get('root_cause', 'N/A') → 'N/A' se il campo manca.
             f"--- Incident {r['id']} (similarity: {similarity:.0%}) ---\n"
             f"Title: {r['title']}\n"
-            f"Category: {r['category']} | Severity: {r['severity']}\n"
+            f"Severity: {r['severity']}\n"
             f"Root cause: {r.get('root_cause', 'N/A')}\n"
             f"Resolution: {r.get('resolution_steps', 'N/A')}\n"
         )

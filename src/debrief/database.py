@@ -72,9 +72,8 @@ def create_tables(conn: sqlite3.Connection):
             id          TEXT PRIMARY KEY,
             title       TEXT NOT NULL,
             description TEXT NOT NULL,
-            category    TEXT,
             severity    TEXT,
-            status      TEXT DEFAULT 'declared',
+            status      TEXT DEFAULT 'open',
             created_by  TEXT,
             session_id  TEXT,
             created_at  TEXT DEFAULT (datetime('now')),
@@ -134,39 +133,46 @@ def load_teams(conn: sqlite3.Connection, teams_path: str):
 
 
 def load_incidents(conn: sqlite3.Connection, incidents_path: str):
-    """Carica gli incidenti seed nel database SQLite.
-    Li mette tutti in stato 'archived' perchè sono incidenti passati."""
+    """Carica gli incidenti seed in SQLite rispettando lo `status` di ciascuno.
+
+    Il dataset di seed contiene un mix dei 3 stati per mostrare tutti i casi:
+    - 'resolved' → incidenti passati e chiusi (con root_cause/resolution + post-mortem);
+    - 'active'   → incidenti classificati e in lavorazione (senza risoluzione);
+    - 'open'     → incidenti dichiarati ma non ancora classificati (senza categoria/severità).
+    Lo status di default è 'resolved' se il campo manca."""
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
     for inc in incidents:
+        status = inc.get("status", "resolved")
+        # resolved_at ha senso solo per gli incidenti chiusi.
+        resolved_at = inc.get("resolved_at", "") if status == "resolved" else None
         conn.execute(
             """INSERT OR REPLACE INTO incidents
-            (id, title, description, category, severity, status, created_at, resolved_at)
-            VALUES (?, ?, ?, ?, ?, 'archived', ?, ?)""",
+            (id, title, description, severity, status, created_at, resolved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (inc["id"], inc["title"], inc["description"],
-            inc["category"], inc["severity"],
-            inc["created_at"], inc.get("resolved_at", ""))
+            inc.get("severity"), status,
+            inc["created_at"], resolved_at)
         )
 
-        # Salva anche il post-mortem come JSON.
-        # Costruiamo un dict con i campi del post-mortem e lo serializziamo come
-        # testo (json.dumps) per salvarlo in una sola colonna TEXT.
-        post_mortem = {
-            "incident_id": inc["id"],
-            "title": inc["title"],
-            "severity": inc["severity"],
-            "impact": inc.get("impact", ""),
-            "detection": inc.get("detection", ""),
-            "root_cause": inc.get("root_cause", ""),
-            "resolution_steps": inc.get("resolution_steps", []),
-        }
-        conn.execute(
-            "INSERT OR REPLACE INTO post_mortems (incident_id, content_json) VALUES (?, ?)",
-            # ensure_ascii=False → mantiene gli accenti italiani leggibili nel JSON
-            # invece di trasformarli in sequenze tipo è.
-            (inc["id"], json.dumps(post_mortem, ensure_ascii=False))
-        )
+        # Il post-mortem si salva SOLO per gli incidenti risolti: sono gli unici
+        # con root_cause e resolution_steps. Lo serializziamo come JSON in una colonna TEXT.
+        if status == "resolved":
+            post_mortem = {
+                "incident_id": inc["id"],
+                "title": inc["title"],
+                "severity": inc["severity"],
+                "impact": inc.get("impact", ""),
+                "detection": inc.get("detection", ""),
+                "root_cause": inc.get("root_cause", ""),
+                "resolution_steps": inc.get("resolution_steps", []),
+            }
+            conn.execute(
+                "INSERT OR REPLACE INTO post_mortems (incident_id, content_json) VALUES (?, ?)",
+                # ensure_ascii=False → mantiene gli accenti italiani leggibili nel JSON.
+                (inc["id"], json.dumps(post_mortem, ensure_ascii=False))
+            )
 
     conn.commit()
     return len(incidents)
@@ -203,7 +209,7 @@ def _next_incident_id(conn: sqlite3.Connection) -> str:
 
 def create_incident(description: str, created_by: str, title: str | None = None,
                     db_path: str | None = None) -> dict:
-    """Crea un nuovo incidente in stato 'declared' e registra il primo evento
+    """Crea un nuovo incidente in stato 'open' e registra il primo evento
     in timeline (il messaggio dell'utente). Restituisce l'incidente creato."""
     conn = get_connection(db_path)
     # try/finally: qualunque cosa accada nel try (anche un errore), il blocco
@@ -215,7 +221,7 @@ def create_incident(description: str, created_by: str, title: str | None = None,
         title = title or "(in attesa di classificazione)"
         conn.execute(
             """INSERT INTO incidents (id, title, description, status, created_by)
-               VALUES (?, ?, ?, 'declared', ?)""",
+               VALUES (?, ?, ?, 'open', ?)""",
             (inc_id, title, description, created_by),
         )
         # Registriamo subito il messaggio dell'utente come primo evento di timeline.
@@ -268,17 +274,17 @@ def list_incidents(status: str | None = None, limit: int = 100, db_path: str | N
         conn.close()
 
 
-def update_incident_classification(incident_id: str, title: str, category: str,
+def update_incident_classification(incident_id: str, title: str,
                                 severity: str, db_path: str | None = None):
-    """Aggiorna i campi prodotti dal triage (titolo, categoria, severità)."""
+    """Aggiorna i campi prodotti dal triage (titolo, severità)."""
     conn = get_connection(db_path)
     try:
         # datetime('now') è una funzione SQL di SQLite: scrive il timestamp corrente.
         conn.execute(
             """UPDATE incidents
-               SET title = ?, category = ?, severity = ?, updated_at = datetime('now')
+               SET title = ?, severity = ?, updated_at = datetime('now')
                WHERE id = ?""",
-            (title, category, severity, incident_id),
+            (title, severity, incident_id),
         )
         conn.commit()
     finally:
@@ -486,11 +492,11 @@ def delete_session(token: str, db_path: str | None = None):
 # --- Metriche (per la dashboard / routes_metrics) ---
 
 def count_by_column(column: str, db_path: str | None = None) -> dict[str, int]:
-    """Conteggio incidenti raggruppati per una colonna (status/severity/category)."""
+    """Conteggio incidenti raggruppati per una colonna (status/severity)."""
     # Controllo di sicurezza: il nome colonna finisce DENTRO la query (non come
     # placeholder ?, perché i ? valgono solo per i valori, non per i nomi di
     # colonna). Quindi accettiamo solo una "whitelist" fissa per evitare injection.
-    if column not in {"status", "severity", "category"}:
+    if column not in {"status", "severity"}:
         raise ValueError(f"Unsupported metric column: {column}")
     conn = get_connection(db_path)
     try:

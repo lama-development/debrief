@@ -1,10 +1,65 @@
 [
   {
     "id": "INC-001",
-    "title": "Applicativo gestionale lento, timeout sulle query",
-    "description": "L'ERP aziendale risponde con estrema lentezza da questa mattina. Gli utenti segnalano timeout quando provano a generare report o aprire ordini di produzione. Il problema sembra peggiorare nelle ore di punta.",
-    "category": "database",
+    "title": "PLC linea 2 in allarme: fermo produzione",
+    "description": "La linea di stampaggio 2 si è fermata improvvisamente. Il PLC mostra un codice di allarme 'Err 47 - Comm Fault' che non riusciamo a interpretare. Gli operatori hanno provato a riavviare ma l'errore persiste. La produzione della linea è completamente bloccata.",
+    "severity": "SEV1",
+    "status": "resolved",
+    "root_cause": "Guasto al modulo di comunicazione Profinet del PLC. Il modulo aveva perso la sincronizzazione con i sensori della pressa, probabilmente per un picco di tensione durante la notte.",
+    "resolution_steps": [
+      "Contattato il fornitore PLC per assistenza remota",
+      "Diagnostica remota: identificato il modulo di comunicazione guasto",
+      "Sostituzione del modulo (intervento del fornitore in loco entro 4 ore)",
+      "Test di funzionamento e ripresa produzione"
+    ],
+    "impact": "Linea 2 ferma per 6 ore. Circa 2000 pezzi non prodotti.",
+    "detection": "Allarme sul quadro operatore e segnalazione immediata del capoturno.",
+    "created_at": "2025-01-28T06:15:00",
+    "resolved_at": "2025-01-28T12:30:00"
+  },
+  {
+    "id": "INC-002",
+    "title": "Errore comunicazione PLC-SCADA sulla linea di estrusione",
+    "description": "Il sistema SCADA non riceve più i dati dalla linea di estrusione. I valori di temperatura e pressione sono fermi sul display. Il PLC sembra funzionare (i macchinari girano) ma la supervisione è cieca.",
     "severity": "SEV2",
+    "status": "resolved",
+    "root_cause": "Cavo Ethernet tra il PLC e lo switch industriale danneggiato. L'ambiente produttivo (calore, vibrazioni) aveva deteriorato il connettore RJ45 nel corso dei mesi.",
+    "resolution_steps": [
+      "Verifica della connettività tra PLC e switch industriale",
+      "Identificazione del cavo deteriorato",
+      "Sostituzione con cavo schermato e connettore industriale M12",
+      "Verifica della ripresa dei dati su SCADA"
+    ],
+    "impact": "Supervisione cieca sulla linea di estrusione per 3 ore. Rischio qualità.",
+    "detection": "Operatore SCADA ha notato i valori fermi a schermo.",
+    "created_at": "2025-03-18T13:40:00",
+    "resolved_at": "2025-03-18T16:50:00"
+  },
+  {
+    "id": "INC-003",
+    "title": "PLC linea 1: programma corrotto dopo blackout",
+    "description": "Dopo un'interruzione di corrente durante la notte, la linea 1 non riparte. Il PLC va in errore all'avvio e il programma sembra corrotto. Il display mostra 'Program Error - Checksum Mismatch'. Le altre linee sono ripartite normalmente.",
+    "severity": "SEV1",
+    "status": "resolved",
+    "root_cause": "La batteria di backup della memoria del PLC era scarica. L'interruzione di corrente ha causato la perdita del programma.",
+    "resolution_steps": [
+      "Contattato il fornitore PLC per il ripristino",
+      "Caricamento del backup del programma PLC",
+      "Verifica e ricalibrazione dei parametri",
+      "Sostituzione della batteria di backup",
+      "Pianificazione di backup periodici mensili del programma PLC"
+    ],
+    "impact": "Linea 1 ferma per un'intera giornata. Produzione spostata sulle altre linee con straordinari.",
+    "detection": "Capoturno del mattino ha trovato la linea in errore all'accensione.",
+    "created_at": "2025-07-15T05:30:00",
+    "resolved_at": "2025-07-15T17:00:00"
+  },
+  {
+    "id": "INC-004",
+    "title": "Applicativo gestionale lento, timeout sulle query",
+    "description": "L'ERP aziendale risponde con estrema lentezza da questa mattina. Gli utenti segnalano timeout quando provano a generare report o aprire ordini di produzione. Il problema peggiora nelle ore di punta.",
+    "severity": "SEV2",
+    "status": "resolved",
     "root_cause": "Il connection pool del database era saturo. Troppe connessioni rimaste aperte da sessioni non chiuse correttamente dall'applicativo dopo l'ultimo aggiornamento.",
     "resolution_steps": [
       "Riavvio del servizio database per liberare le connessioni pendenti",
@@ -12,21 +67,21 @@
       "Segnalazione al fornitore software del bug nella gestione delle sessioni"
     ],
     "impact": "Tutti gli utenti dell'ERP (circa 30 persone) hanno avuto rallentamenti per 3 ore. Nessun dato perso.",
-    "detection": "Segnalazione degli utenti dell'ufficio acquisti che non riuscivano a lavorare.",
+    "detection": "Segnalazione degli utenti dell'ufficio acquisti.",
     "created_at": "2025-01-15T08:30:00",
     "resolved_at": "2025-01-15T11:45:00"
   },
   {
-    "id": "INC-002",
+    "id": "INC-005",
     "title": "Database PostgreSQL: troppe connessioni attive",
-    "description": "Monitoraggio segnala che il numero di connessioni attive al database ha superato il 90% del limite massimo. Alcune query iniziano a fallire con errore 'too many connections'. Il gestionale funziona a singhiozzo.",
-    "category": "database",
+    "description": "Il monitoraggio segnala che il numero di connessioni attive al database ha superato il 90% del limite massimo. Alcune query iniziano a fallire con errore 'too many connections'. Il gestionale funziona a singhiozzo.",
     "severity": "SEV2",
+    "status": "resolved",
     "root_cause": "Connection pool esaurito. Il nuovo modulo di reportistica apriva connessioni senza rilasciarle, accumulandole nel corso della giornata.",
     "resolution_steps": [
       "Kill delle connessioni idle da più di 30 minuti",
-      "Configurazione di un timeout automatico sulle connessioni inattive (idle_in_transaction_session_timeout)",
-      "Coordinamento con il fornitore software per fix del modulo reportistica"
+      "Configurazione di un timeout sulle connessioni inattive (idle_in_transaction_session_timeout)",
+      "Coordinamento con il fornitore software per il fix del modulo reportistica"
     ],
     "impact": "Rallentamenti intermittenti per 2 ore su tutti gli applicativi che usano il database.",
     "detection": "Alert automatico sul numero di connessioni attive.",
@@ -34,599 +89,79 @@
     "resolved_at": "2025-04-22T16:30:00"
   },
   {
-    "id": "INC-003",
+    "id": "INC-006",
     "title": "Errore connessione DB durante chiusura mensile",
-    "description": "Durante la chiusura contabile di fine mese, il software di contabilità ha smesso di rispondere. L'errore nei log è 'connection refused' verso il server database. Il problema si è presentato quando diversi utenti hanno lanciato contemporaneamente i report di chiusura.",
-    "category": "database",
+    "description": "Durante la chiusura contabile di fine mese, il software di contabilità ha smesso di rispondere. L'errore nei log è 'connection refused' verso il server database. Si è presentato quando diversi utenti hanno lanciato contemporaneamente i report di chiusura.",
     "severity": "SEV1",
-    "root_cause": "Il pool di connessioni al database era dimensionato per il carico normale ma non per il picco della chiusura mensile. Tutte le connessioni occupate dai report pesanti, nessuna disponibile per le operazioni normali.",
+    "status": "resolved",
+    "root_cause": "Il pool di connessioni era dimensionato per il carico normale ma non per il picco della chiusura mensile. Tutte le connessioni occupate dai report pesanti, nessuna disponibile per le operazioni normali.",
     "resolution_steps": [
       "Riavvio del servizio database in emergenza",
       "Scaglionamento dei report di chiusura su fasce orarie diverse",
       "Aumento permanente del pool e aggiunta di connection queueing"
     ],
-    "impact": "Blocco completo della contabilità per 1.5 ore durante la chiusura mensile. Ritardo nella consegna dei dati alla direzione.",
+    "impact": "Blocco completo della contabilità per 1.5 ore durante la chiusura mensile.",
     "detection": "Chiamata urgente dalla responsabile amministrativa.",
     "created_at": "2025-06-30T09:00:00",
     "resolved_at": "2025-06-30T10:30:00"
   },
-
-  {
-    "id": "INC-004",
-    "title": "Latenza di rete elevata verso i server di produzione",
-    "description": "I PC in reparto produzione segnalano lentezza estrema nell'accesso alle cartelle condivise e al gestionale. I ping verso il server principale mostrano tempi di 200-500ms invece dei soliti 1-2ms. Il problema riguarda solo la rete del reparto produzione, gli uffici funzionano normalmente.",
-    "category": "network",
-    "severity": "SEV2",
-    "root_cause": "Uno switch di piano nel reparto produzione aveva una porta in errore che generava broadcast storm parziale, saturando la banda disponibile.",
-    "resolution_steps": [
-      "Identificazione dello switch problematico tramite analisi del traffico",
-      "Disabilitazione della porta in errore",
-      "Sostituzione del cavo di rete difettoso collegato alla porta"
-    ],
-    "impact": "Rallentamento delle operazioni in reparto produzione per 4 ore. Nessun fermo macchina ma operatori impossibilitati a consultare le distinte base.",
-    "detection": "Segnalazione multipla dagli operatori di produzione.",
-    "created_at": "2025-02-10T07:15:00",
-    "resolved_at": "2025-02-10T11:20:00"
-  },
-  {
-    "id": "INC-005",
-    "title": "Perdita pacchetti sulla rete del magazzino",
-    "description": "I terminali barcode del magazzino perdono frequentemente la connessione WiFi. Le letture dei codici a barre non vengono registrate e gli operatori devono ripetere le operazioni più volte. Il problema è intermittente e peggiora quando i carrelli si spostano verso il fondo del capannone.",
-    "category": "network",
-    "severity": "SEV3",
-    "root_cause": "Access point WiFi del magazzino in sovraccarico e con copertura insufficiente nella zona nuova del capannone ampliato 6 mesi fa. L'ampliamento non era stato accompagnato dall'estensione della copertura WiFi.",
-    "resolution_steps": [
-      "Installazione di un access point aggiuntivo nella zona scoperta",
-      "Aggiornamento firmware degli AP esistenti",
-      "Riconfigurazione del roaming tra AP per transizioni più fluide"
-    ],
-    "impact": "Rallentamento delle operazioni di magazzino, errori di inventario da risolvere manualmente.",
-    "detection": "Lamentele ripetute del responsabile magazzino nell'arco di una settimana.",
-    "created_at": "2025-03-05T10:00:00",
-    "resolved_at": "2025-03-07T16:00:00"
-  },
-  {
-    "id": "INC-006",
-    "title": "Rete instabile: disconnessioni continue in ufficio tecnico",
-    "description": "Tre postazioni nell'ufficio tecnico perdono la connessione di rete a intervalli di 10-15 minuti. Il cavo tester non rileva problemi. Le postazioni sono collegate allo stesso switch. Il problema è iniziato dopo lo spostamento delle scrivanie della settimana scorsa.",
-    "category": "network",
-    "severity": "SEV3",
-    "root_cause": "Durante lo spostamento delle scrivanie, un cavo di rete era stato piegato con un raggio troppo stretto sotto la canalina, causando disconnessioni intermittenti sotto vibrazione (passaggio di carrelli nel corridoio adiacente).",
-    "resolution_steps": [
-      "Ispezione fisica di tutti i cablaggi dell'ufficio tecnico",
-      "Sostituzione del cavo danneggiato",
-      "Riorganizzazione della canalina con raggi di curvatura corretti"
-    ],
-    "impact": "Tre persone dell'ufficio tecnico con connettività intermittente per 5 giorni lavorativi.",
-    "detection": "Ticket helpdesk ripetuti dalle stesse postazioni.",
-    "created_at": "2025-05-12T09:00:00",
-    "resolved_at": "2025-05-14T14:00:00"
-  },
-
   {
     "id": "INC-007",
-    "title": "PLC linea 2 in allarme: fermo produzione",
-    "description": "La linea di stampaggio 2 si è fermata improvvisamente. Il PLC mostra un codice di allarme che non riusciamo a interpretare. Il display indica 'Err 47 - Comm Fault'. Gli operatori hanno provato a riavviare ma l'errore persiste. La produzione della linea è completamente bloccata.",
-    "category": "hardware",
-    "severity": "SEV1",
-    "root_cause": "Guasto al modulo di comunicazione Profinet del PLC. Il modulo aveva perso la sincronizzazione con i sensori della pressa, probabilmente per un picco di tensione durante la notte.",
-    "resolution_steps": [
-      "Contattato il fornitore PLC per assistenza remota",
-      "Il tecnico del fornitore ha identificato il modulo guasto via diagnostica remota",
-      "Sostituzione del modulo di comunicazione (intervento del fornitore in loco entro 4 ore)",
-      "Test di funzionamento e ripresa produzione"
-    ],
-    "impact": "Linea 2 ferma per 6 ore. Circa 2000 pezzi non prodotti. Necessario ripianificare la produzione del giorno successivo.",
-    "detection": "Allarme sul quadro operatore e segnalazione immediata del capoturno.",
-    "created_at": "2025-01-28T06:15:00",
-    "resolved_at": "2025-01-28T12:30:00"
-  },
-  {
-    "id": "INC-008",
-    "title": "Errore comunicazione PLC-SCADA sulla linea di estrusione",
-    "description": "Il sistema SCADA non riceve più i dati dalla linea di estrusione. I valori di temperatura e pressione sono fermi sul display. Il PLC della linea sembra funzionare (i macchinari girano) ma la supervisione è cieca. Non possiamo verificare se i parametri sono nei limiti.",
-    "category": "hardware",
-    "severity": "SEV2",
-    "root_cause": "Cavo Ethernet tra il PLC e lo switch industriale danneggiato. L'ambiente produttivo (calore, vibrazioni) aveva deteriorato il connettore RJ45 nel corso dei mesi.",
-    "resolution_steps": [
-      "Verifica della connettività tra PLC e switch industriale",
-      "Identificazione del cavo deteriorato",
-      "Sostituzione del cavo con uno schermato e con connettore industriale M12",
-      "Verifica della ripresa dei dati su SCADA"
-    ],
-    "impact": "Supervisione cieca sulla linea di estrusione per 3 ore. Produzione continuata ma senza monitoraggio dei parametri. Rischio qualità.",
-    "detection": "Operatore SCADA ha notato i valori fermi a schermo.",
-    "created_at": "2025-03-18T13:40:00",
-    "resolved_at": "2025-03-18T16:50:00"
-  },
-  {
-    "id": "INC-009",
-    "title": "Macchinario di stampaggio: parametri fuori range, fermo automatico",
-    "description": "La pressa a iniezione 4 si è fermata con allarme di sicurezza. Il PLC ha rilevato temperatura dello stampo fuori dai limiti impostati e ha attivato il blocco automatico. L'operatore non riesce a resettare l'allarme dal pannello.",
-    "category": "hardware",
-    "severity": "SEV2",
-    "root_cause": "Sonda di temperatura difettosa che leggeva valori errati. La temperatura reale era nei limiti ma la sonda guasta ha fatto scattare il blocco di sicurezza del PLC.",
-    "resolution_steps": [
-      "Verifica dei valori di temperatura con termometro esterno (nella norma)",
-      "Identificazione della sonda difettosa tramite confronto con le altre",
-      "Bypass temporaneo della sonda guasta nel PLC (autorizzato dal fornitore)",
-      "Ordine e sostituzione della sonda il giorno successivo",
-      "Reset dell'allarme e ripresa produzione"
-    ],
-    "impact": "Pressa 4 ferma per 2 ore. Ordine cliente in ritardo di mezza giornata.",
-    "detection": "Allarme automatico sul pannello operatore.",
-    "created_at": "2025-05-07T10:20:00",
-    "resolved_at": "2025-05-07T12:15:00"
-  },
-  {
-    "id": "INC-010",
-    "title": "PLC linea 1: programma corrotto dopo blackout",
-    "description": "Dopo un'interruzione di corrente durante la notte, la linea 1 non riparte. Il PLC va in errore all'avvio e il programma sembra corrotto. Il display mostra 'Program Error - Checksum Mismatch'. Le altre linee alimentate dallo stesso quadro sono ripartite normalmente.",
-    "category": "hardware",
-    "severity": "SEV1",
-    "root_cause": "La batteria di backup della memoria del PLC era scarica. L'interruzione di corrente ha causato la perdita del programma. Le altre linee avevano batterie più recenti.",
-    "resolution_steps": [
-      "Contattato il fornitore PLC per il ripristino",
-      "Caricamento del backup del programma PLC (ultimo backup: 2 mesi fa)",
-      "Verifica e ricalibrazione dei parametri modificati dopo l'ultimo backup",
-      "Sostituzione della batteria di backup",
-      "Pianificazione backup periodici mensili del programma PLC"
-    ],
-    "impact": "Linea 1 ferma per un'intera giornata. Produzione spostata parzialmente sulle altre linee con straordinari.",
-    "detection": "Capoturno del mattino ha trovato la linea in errore all'accensione.",
-    "created_at": "2025-07-15T05:30:00",
-    "resolved_at": "2025-07-15T17:00:00"
-  },
-
-  {
-    "id": "INC-011",
     "title": "Server principale: disco pieno, servizi bloccati",
-    "description": "Il server principale non risponde più. Tentando l'accesso remoto via RDP, il login fallisce. Collegandosi fisicamente, il sistema operativo segnala disco C: pieno al 100%. Tutti i servizi ospitati (file server, print server, DHCP) sono giù.",
-    "category": "infrastructure",
+    "description": "Il server principale non risponde più. Tentando l'accesso remoto via RDP il login fallisce. Collegandosi fisicamente, il sistema segnala disco C: pieno al 100%. Tutti i servizi ospitati (file server, print server, DHCP) sono giù.",
     "severity": "SEV1",
+    "status": "resolved",
     "root_cause": "I log di Windows Event non venivano ruotati da mesi e hanno occupato 180GB. Il disco si è riempito gradualmente senza che nessun alert fosse configurato.",
     "resolution_steps": [
       "Accesso fisico al server e pulizia dei log più vecchi di 30 giorni",
       "Liberati 160GB, riavvio dei servizi",
-      "Configurazione della rotazione automatica dei log (max 30 giorni)",
+      "Configurazione della rotazione automatica dei log",
       "Configurazione di un alert quando il disco supera l'80%"
     ],
-    "impact": "Tutti i servizi di rete giù per 1.5 ore. Nessuno poteva stampare, accedere ai file condivisi o ottenere un indirizzo IP.",
+    "impact": "Tutti i servizi di rete giù per 1.5 ore. Nessuno poteva stampare, accedere ai file condivisi o ottenere un IP.",
     "detection": "Segnalazioni multiple da tutti i reparti all'apertura degli uffici.",
     "created_at": "2025-02-03T08:00:00",
     "resolved_at": "2025-02-03T09:30:00"
   },
   {
-    "id": "INC-012",
-    "title": "Spazio esaurito sul server database",
-    "description": "Il database PostgreSQL ha smesso di accettare scritture con errore 'could not extend filè. La partizione /var/lib/postgresql è al 100%. Le applicazioni che scrivono sul database (gestionale, sistema presenze) restituiscono errori.",
-    "category": "infrastructure",
-    "severity": "SEV2",
-    "root_cause": "I backup giornalieri del database venivano salvati sulla stessa partizione dei dati. In 4 mesi si erano accumulati oltre 200 backup senza pulizia automatica.",
-    "resolution_steps": [
-      "Rimozione dei backup più vecchi di 30 giorni dalla partizione dati",
-      "Spostamento della directory di backup su un disco dedicato",
-      "Configurazione di uno script di pulizia automatica dei backup (retention 30 giorni)",
-      "Aggiunta di monitoring sullo spazio disco con alert al 75% e 90%"
-    ],
-    "impact": "Applicazioni in sola lettura per 45 minuti. Nessun dato perso, il database era integro.",
-    "detection": "Errore nell'applicativo gestionale segnalato dall'ufficio vendite.",
-    "created_at": "2025-04-10T11:20:00",
-    "resolved_at": "2025-04-10T12:05:00"
-  },
-  {
-    "id": "INC-013",
-    "title": "Log non ruotati: /var/log pieno sul server di posta",
-    "description": "Il server di posta interno ha smesso di ricevere email. I messaggi rimbalzano ai mittenti con errore di spazio. Controllando il server, /var/log occupa 95GB su una partizione da 100GB. I log del mail server non venivano compressi nè cancellati.",
-    "category": "infrastructure",
-    "severity": "SEV2",
-    "root_cause": "Logrotate era configurato ma il servizio cron non era attivo sul server di posta, quindi la rotazione dei log non veniva mai eseguita.",
-    "resolution_steps": [
-      "Compressione e archiviazione dei log vecchi",
-      "Riattivazione del servizio cron",
-      "Verifica che logrotate funzioni correttamente",
-      "Test di invio/ricezione email dopo il ripristino"
-    ],
-    "impact": "Email in entrata e in uscita bloccate per circa 2 ore.",
-    "detection": "Clienti e fornitori hanno segnalato email rimbalzate.",
-    "created_at": "2025-08-20T14:30:00",
-    "resolved_at": "2025-08-20T16:15:00"
-  },
-
-  {
-    "id": "INC-014",
-    "title": "Outlook non sincronizza la posta su più postazioni",
-    "description": "Da stamattina circa 10 utenti segnalano che Outlook non scarica nuove email. La webmail funziona correttamente. Il problema riguarda solo il client Outlook desktop, sia su PC fissi che su portatili. Outlook mostra 'Connessione in corso...' ma non completa mai la sincronizzazione.",
-    "category": "helpdesk",
-    "severity": "SEV3",
-    "root_cause": "Un aggiornamento automatico di Windows ha modificato le impostazioni del profilo di Outlook, rompendo l'autodiscover. L'aggiornamento è stato distribuito la notte precedente.",
-    "resolution_steps": [
-      "Identificazione dell'aggiornamento problematico (KB5034441)",
-      "Ricreazione del profilo Outlook sulle postazioni affette",
-      "Preparazione di uno script per la ricreazione automatica del profilo",
-      "Segnalazione del problema al canale di supporto Microsoft"
-    ],
-    "impact": "10 utenti senza email desktop per mezza giornata. Usata la webmail come workaround.",
-    "detection": "Ticket multipli all'helpdesk nelle prime ore della mattina.",
-    "created_at": "2025-03-25T08:15:00",
-    "resolved_at": "2025-03-25T13:00:00"
-  },
-  {
-    "id": "INC-015",
-    "title": "Client di posta bloccato: allegati non si aprono",
-    "description": "Diversi utenti segnalano che non riescono ad aprire gli allegati ricevuti via email. Outlook mostra un messaggio generico 'Impossibile aprire il filè. Il problema riguarda tutti i tipi di allegati (PDF, Excel, Word). Salvando l'allegato sul desktop, si apre normalmente.",
-    "category": "helpdesk",
-    "severity": "SEV4",
-    "root_cause": "La cartella temporanea di Outlook (Secure Temp Folder) era piena. Outlook salva gli allegati in una cartella nascosta prima di aprirli, e questa cartella non viene mai svuotata automaticamente.",
-    "resolution_steps": [
-      "Svuotamento della cartella temporanea di Outlook su tutte le postazioni affette",
-      "Creazione di uno script di pulizia programmato settimanale",
-      "Documentazione della procedura per il team helpdesk"
-    ],
-    "impact": "Fastidio per gli utenti ma workaround disponibile (salvare e aprire). Nessun impatto su produzione.",
-    "detection": "Ticket helpdesk da 5 utenti diversi in 2 giorni.",
-    "created_at": "2025-06-02T09:45:00",
-    "resolved_at": "2025-06-02T11:00:00"
-  },
-  {
-    "id": "INC-016",
-    "title": "Posta in uscita bloccata: email restano nella coda",
-    "description": "Gli utenti segnalano che le email inviate restano nella posta in uscita e non vengono consegnate. Le email in arrivo funzionano regolarmente. Il problema riguarda tutti gli utenti. Nella cartella Posta in uscita si accumulano decine di messaggi.",
-    "category": "helpdesk",
-    "severity": "SEV2",
-    "root_cause": "Il certificato SSL del server SMTP era scaduto durante la notte. Outlook rifiutava di inviare tramite un server con certificato non valido ma non mostrava un errore chiaro all'utente.",
-    "resolution_steps": [
-      "Rinnovo del certificato SSL sul server di posta",
-      "Riavvio del servizio SMTP",
-      "Verifica che tutte le email in coda siano state inviate",
-      "Impostazione di un reminder per il rinnovo del certificato (scadenza fra 1 anno)"
-    ],
-    "impact": "Nessun utente poteva inviare email per 3 ore. Email in arrivo funzionanti.",
-    "detection": "Segnalazione dall'ufficio commerciale che non riusciva a rispondere ai clienti.",
-    "created_at": "2025-09-10T08:00:00",
-    "resolved_at": "2025-09-10T11:00:00"
-  },
-
-  {
-    "id": "INC-017",
-    "title": "Deploy gestionale fallito: applicativo non parte",
-    "description": "Dopo l'aggiornamento del gestionale alla versione 4.2, l'applicazione non si avvia. Il servizio parte e si ferma immediatamente. I log mostrano un errore di migrazione del database. Gli utenti vedono una pagina bianca.",
-    "category": "deployment",
-    "severity": "SEV1",
-    "root_cause": "Lo script di migrazione del database presupponeva una colonna che era stata rinominata in un aggiornamento precedente non applicato. Il fornitore aveva rilasciato la 4.2 assumendo che la 4.1.5 fosse già installata, ma noi eravamo ancora alla 4.1.3.",
-    "resolution_steps": [
-      "Rollback alla versione 4.1.3 dal backup pre-deploy",
-      "Applicazione degli aggiornamenti intermedi (4.1.4, 4.1.5) in sequenza",
-      "Nuovo tentativo di deploy della 4.2 (riuscito)",
-      "Documentazione della procedura: verificare sempre la versione corrente prima di aggiornare"
-    ],
-    "impact": "Gestionale non disponibile per 4 ore. Utenti fermi, produzione ha lavorato con i fogli cartacei.",
-    "detection": "Segnalazione immediata all'apertura degli uffici post-aggiornamento.",
-    "created_at": "2025-04-05T07:30:00",
-    "resolved_at": "2025-04-05T11:30:00"
-  },
-  {
-    "id": "INC-018",
-    "title": "Aggiornamento firmware switch: rete in tilt",
-    "description": "Dopo l'aggiornamento del firmware dello switch core durante la finestra di manutenzione notturna, la rete non funziona correttamente al mattino. Alcune VLAN non comunicano tra loro, altre hanno loop. Lo switch sembra funzionare ma la configurazione è stata parzialmente sovrascritta dal nuovo firmware.",
-    "category": "deployment",
-    "severity": "SEV1",
-    "root_cause": "Il nuovo firmware aveva un formato di configurazione diverso per le VLAN. L'import automatico della configurazione precedente ha funzionato solo parzialmente, corrompendo le regole di routing inter-VLAN.",
-    "resolution_steps": [
-      "Rollback al firmware precedente",
-      "Ripristino della configurazione dal backup",
-      "Verifica della compatibilità del nuovo firmware con la configurazione esistente (leggere le release notes)",
-      "Pianificazione di un nuovo tentativo con test su switch secondario prima"
-    ],
-    "impact": "Rete parzialmente non funzionante per 3 ore al mattino. Produzione e uffici impattati.",
-    "detection": "Segnalazioni multiple all'accensione dei PC al mattino.",
-    "created_at": "2025-05-20T07:00:00",
-    "resolved_at": "2025-05-20T10:00:00"
-  },
-  {
-    "id": "INC-019",
-    "title": "Container del sistema presenze non parte dopo riavvio server",
-    "description": "Il sistema di rilevazione presenze non funziona dopo il riavvio programmato del server nel weekend. Il container Docker del servizio va in crash loop. I log indicano che non riesce a connettersi al database. I dipendenti non possono timbrare.",
-    "category": "deployment",
-    "severity": "SEV2",
-    "root_cause": "Il container del database partiva dopo quello dell'applicazione. Mancava la configurazione 'depends_on' con health check nel docker-compose. Il problema non si vedeva in condizioni normali perchè il database era sempre già attivo.",
-    "resolution_steps": [
-      "Riavvio manuale dei container nell'ordine corretto (database, poi applicazione)",
-      "Aggiunta di depends_on con condition: service_healthy nel docker-compose",
-      "Aggiunta di health check al container database",
-      "Test di riavvio completo per verificare la sequenza"
-    ],
-    "impact": "Sistema presenze non funzionante per 2 ore il lunedì mattina. Timbrate manuali da inserire dopo.",
-    "detection": "Segnalazione del responsabile HR al lunedì mattina.",
-    "created_at": "2025-06-16T08:00:00",
-    "resolved_at": "2025-06-16T10:00:00"
-  },
-
-  {
-    "id": "INC-020",
-    "title": "VPN non si connette per i lavoratori da remoto",
-    "description": "Tre dipendenti che lavorano da casa segnalano che la VPN non si connette più da stamattina. L'errore è 'Connection timed out'. Un quarto dipendente in remoto riesce a connettersi senza problemi.",
-    "category": "network",
-    "severity": "SEV3",
-    "root_cause": "Il server VPN aveva esaurito il pool di indirizzi IP assegnabili ai client (pool configurato con solo 10 indirizzi, 8 già occupati da sessioni non disconnesse).",
-    "resolution_steps": [
-      "Disconnessione delle sessioni VPN inattive",
-      "Ampliamento del pool di indirizzi da 10 a 30",
-      "Configurazione di un timeout per le sessioni VPN inattive (4 ore)"
-    ],
-    "impact": "3 dipendenti in smart working impossibilitati a lavorare per 2 ore.",
-    "detection": "Chiamate dei dipendenti all'helpdesk.",
-    "created_at": "2025-03-10T09:00:00",
-    "resolved_at": "2025-03-10T11:00:00"
-  },
-  {
-    "id": "INC-021",
-    "title": "Timeout VPN per utenti remoti: lentezza insopportabile",
-    "description": "I dipendenti collegati in VPN segnalano lentezza estrema. Le operazioni sul gestionale che normalmente richiedono 2 secondi ne impiegano 30. Alcuni timeout. I test di velocità degli utenti mostrano banda sufficiente sulle loro connessioni domestiche.",
-    "category": "network",
-    "severity": "SEV3",
-    "root_cause": "Il firewall aziendale aveva attivato l'ispezione deep packet inspection (DPI) anche sul tunnel VPN dopo un aggiornamento delle regole di sicurezza. Il DPI aggiungeva latenza significativa a ogni pacchetto VPN.",
-    "resolution_steps": [
-      "Identificazione del collo di bottiglia tramite traceroute e analisi del firewall",
-      "Disabilitazione del DPI sul traffico VPN (già cifrato, il DPI non aggiungeva sicurezza)",
-      "Verifica delle performance con gli utenti remoti"
-    ],
-    "impact": "Tutti i lavoratori remoti (8 persone) con prestazioni degradate per 2 giorni prima della segnalazione.",
-    "detection": "Lamentela del responsabile commerciale che lavora spesso da casa.",
-    "created_at": "2025-07-01T10:30:00",
-    "resolved_at": "2025-07-01T15:00:00"
-  },
-  {
-    "id": "INC-022",
+    "id": "INC-008",
     "title": "Certificato VPN scaduto: nessuno riesce a collegarsi",
     "description": "Da stamattina nessun utente riesce a stabilire la connessione VPN. Il client VPN mostra 'Certificate validation failed'. Il problema riguarda tutti gli utenti senza eccezione. Ieri sera funzionava tutto.",
-    "category": "network",
     "severity": "SEV2",
+    "status": "resolved",
     "root_cause": "Il certificato SSL del server VPN è scaduto durante la notte. Non era stato impostato nessun promemoria per il rinnovo.",
     "resolution_steps": [
       "Rinnovo del certificato SSL sul server VPN",
       "Riavvio del servizio VPN",
       "Test di connessione con un utente remoto",
-      "Impostazione di un reminder nel calendario per il rinnovo (90 giorni prima della scadenza)"
+      "Impostazione di un reminder per il rinnovo (90 giorni prima della scadenza)"
     ],
-    "impact": "Tutti i lavoratori remoti bloccati per 1.5 ore. Riunioni online non accessibili dalle postazioni interne come workaround parziale.",
+    "impact": "Tutti i lavoratori remoti bloccati per 1.5 ore.",
     "detection": "Chiamate simultanee da tutti i dipendenti in smart working.",
     "created_at": "2025-10-01T08:30:00",
     "resolved_at": "2025-10-01T10:00:00"
   },
-
   {
-    "id": "INC-023",
-    "title": "Stampante di produzione: etichette illeggibili",
-    "description": "La stampante di etichette nella zona imballaggio stampa etichette sbiadite e parzialmente illeggibili. I codici a barre non vengono letti dagli scanner. Il problema è graduale, peggiora nel corso della giornata.",
-    "category": "hardware",
+    "id": "INC-009",
+    "title": "Client di posta bloccato: allegati non si aprono",
+    "description": "Diversi utenti segnalano che non riescono ad aprire gli allegati ricevuti via email. Outlook mostra 'Impossibile aprire il file'. Riguarda tutti i tipi di allegati (PDF, Excel, Word). Salvando l'allegato sul desktop, si apre normalmente.",
+    "severity": "SEV4",
+    "status": "active",
+    "created_at": "2026-06-11T09:45:00"
+  },
+  {
+    "id": "INC-010",
+    "title": "Perdita pacchetti sulla rete del magazzino",
+    "description": "I terminali barcode del magazzino perdono frequentemente la connessione WiFi. Le letture dei codici a barre non vengono registrate e gli operatori devono ripetere le operazioni. Il problema è intermittente e peggiora verso il fondo del capannone.",
     "severity": "SEV3",
-    "root_cause": "Testina di stampa termica usurata. La stampante era in uso continuo da 14 mesi senza manutenzione programmata.",
-    "resolution_steps": [
-      "Pulizia della testina come intervento immediato (miglioramento temporaneo)",
-      "Ordine e sostituzione della testina di stampa",
-      "Impostazione di un piano di manutenzione trimestrale per le stampanti industriali"
-    ],
-    "impact": "Etichettatura rallentata, alcuni colli spediti con etichette manuali.",
-    "detection": "Segnalazione dell'operatore di imballaggio.",
-    "created_at": "2025-02-20T14:00:00",
-    "resolved_at": "2025-02-22T09:00:00"
+    "status": "active",
+    "created_at": "2026-06-12T10:00:00"
   },
   {
-    "id": "INC-024",
-    "title": "UPS server room: allarme batteria",
-    "description": "L'UPS della sala server segnala 'Battery Fault' sul display. Il tempo di autonomia stimato è sceso da 30 minuti a 3 minuti. In caso di blackout, i server si spegnerebbero quasi istantaneamente senza shutdown ordinato.",
-    "category": "infrastructure",
-    "severity": "SEV2",
-    "root_cause": "Batterie dell'UPS giunte a fine vita (installate 4 anni fa, durata prevista 3-5 anni).",
-    "resolution_steps": [
-      "Ordine urgente di un set di batterie sostitutive",
-      "Nel frattempo, alert via email a tutto il team IT in caso di interruzione di corrente",
-      "Sostituzione delle batterie alla consegna (2 giorni)",
-      "Documentazione della data di sostituzione e scadenza prevista"
-    ],
-    "impact": "Nessun impatto immediato, ma rischio critico in caso di blackout.",
-    "detection": "Controllo periodico della sala server (settimanale).",
-    "created_at": "2025-04-14T10:00:00",
-    "resolved_at": "2025-04-16T11:00:00"
-  },
-  {
-    "id": "INC-025",
-    "title": "Ransomware tentativo bloccato dall'antivirus",
-    "description": "L'antivirus su una postazione dell'ufficio acquisti ha rilevato e bloccato un tentativo di esecuzione di un file sospetto scaricato da un'email di phishing. L'utente aveva cliccato su un link in un'email che sembrava provenire da un fornitore.",
-    "category": "security",
-    "severity": "SEV2",
-    "root_cause": "Email di phishing molto convincente con dominio simile a quello di un fornitore reale. L'utente non ha verificato l'indirizzo del mittente.",
-    "resolution_steps": [
-      "Quarantena del file e scansione completa della postazione",
-      "Scansione delle altre postazioni per lo stesso indicatore di compromissione",
-      "Reset della password dell'utente per precauzione",
-      "Comunicazione a tutto il personale con esempio dell'email di phishing",
-      "Blocco del dominio del mittente nel filtro anti-spam"
-    ],
-    "impact": "Nessun danno grazie all'antivirus. Potenziale rischio elevato se non fosse stato bloccato.",
-    "detection": "Alert dell'antivirus centralizzato.",
-    "created_at": "2025-05-28T11:30:00",
-    "resolved_at": "2025-05-28T14:00:00"
-  },
-  {
-    "id": "INC-026",
-    "title": "Backup notturno fallito da 5 giorni",
-    "description": "Il report settimanale dei backup mostra che il backup notturno del server principale fallisce da 5 giorni consecutivi con errore 'destination unreachablè. Il NAS di backup non è raggiungibile dal server.",
-    "category": "infrastructure",
-    "severity": "SEV2",
-    "root_cause": "Il NAS si era riavviato dopo un aggiornamento firmware automatico e non aveva rimontato correttamente la share di backup. L'interfaccia web del NAS non mostrava errori.",
-    "resolution_steps": [
-      "Rimontaggio manuale della share sul NAS",
-      "Lancio di un backup completo manuale per recuperare",
-      "Disabilitazione degli aggiornamenti firmware automatici sul NAS",
-      "Aggiunta di un check giornaliero che verifica la raggiungibilità del NAS prima del backup"
-    ],
-    "impact": "5 giorni senza backup. Nessuna perdita dati ma finestra di rischio elevato.",
-    "detection": "Report settimanale di verifica dei backup (processo manuale).",
-    "created_at": "2025-06-23T09:00:00",
-    "resolved_at": "2025-06-23T12:00:00"
-  },
-  {
-    "id": "INC-027",
-    "title": "PC ufficio tecnico: schermata blu ricorrente",
-    "description": "Una postazione dell'ufficio tecnico va in schermata blu (BSOD) 2-3 volte al giorno. L'errore è KERNEL_DATA_INPAGE_ERROR. L'utente perde il lavoro non salvato ogni volta. Il problema è iniziato circa una settimana fa.",
-    "category": "helpdesk",
-    "severity": "SEV3",
-    "root_cause": "Hard disk meccanico con settori danneggiati. I log SMART confermavano il deterioramento progressivo del disco.",
-    "resolution_steps": [
-      "Backup immediato dei dati dell'utente",
-      "Sostituzione del disco con un SSD",
-      "Reinstallazione del sistema operativo e degli applicativi",
-      "Ripristino dei dati dal backup"
-    ],
-    "impact": "Un utente con lavoro instabile per una settimana. Alcune ore di lavoro perse per i crash.",
-    "detection": "Segnalazione dell'utente dopo il terzo crash in un giorno.",
-    "created_at": "2025-07-08T15:00:00",
-    "resolved_at": "2025-07-09T12:00:00"
-  },
-  {
-    "id": "INC-028",
-    "title": "Telefoni VoIP: nessun audio nelle chiamate",
+    "id": "INC-011",
+    "title": "Telefoni VoIP del commerciale: nessun audio nelle chiamate",
     "description": "I telefoni VoIP dell'ufficio commerciale squillano e si connettono ma non c'è audio in nessuna direzione. Il problema riguarda solo i 6 telefoni del commerciale, gli altri reparti funzionano. I telefoni hanno IP nella stessa subnet.",
-    "category": "network",
-    "severity": "SEV2",
-    "root_cause": "Una regola del firewall aggiunta per bloccare traffico UDP sospetto stava bloccando anche il traffico RTP (audio VoIP) della VLAN del commerciale.",
-    "resolution_steps": [
-      "Identificazione della regola firewall problematica",
-      "Modifica della regola per escludere il traffico RTP delle VLAN voce",
-      "Test delle chiamate con l'ufficio commerciale",
-      "Revisione delle regole firewall per evitare impatti collaterali"
-    ],
-    "impact": "Ufficio commerciale impossibilitato a ricevere e fare chiamate per mezza giornata. Usati cellulari personali.",
-    "detection": "Segnalazione urgente del direttore commerciale.",
-    "created_at": "2025-08-05T10:00:00",
-    "resolved_at": "2025-08-05T13:00:00"
-  },
-  {
-    "id": "INC-029",
-    "title": "Software CAD non si attiva: licenza scaduta",
-    "description": "Il software CAD usato dall'ufficio tecnico per la progettazione degli stampi non si avvia e mostra 'License expired'. Tre progettisti non possono lavorare. La licenza era in abbonamento annuale.",
-    "category": "application",
-    "severity": "SEV3",
-    "root_cause": "Il rinnovo della licenza era stato dimenticato. Il contratto prevedeva il rinnovo il 1° agosto, nessuno aveva ricevuto o notato il promemoria del fornitore.",
-    "resolution_steps": [
-      "Contatto urgente con il fornitore per il rinnovo",
-      "Pagamento e riattivazione della licenza (procedura di 4 ore)",
-      "Inserimento nel calendario condiviso IT di tutti i rinnovi licenze con alert a 30 e 7 giorni"
-    ],
-    "impact": "3 progettisti fermi per mezza giornata. Ritardo su un progetto per un cliente.",
-    "detection": "Segnalazione del responsabile ufficio tecnico.",
-    "created_at": "2025-08-01T08:30:00",
-    "resolved_at": "2025-08-01T13:00:00"
-  },
-  {
-    "id": "INC-030",
-    "title": "Sistema presenze non registra le timbrature",
-    "description": "I badge dei dipendenti vengono letti dal terminale (luce verde) ma le timbrature non compaiono nel software. Il problema è iniziato dopo il weekend. Il terminale funziona meccanicamente ma i dati non arrivano al server.",
-    "category": "application",
-    "severity": "SEV3",
-    "root_cause": "Il servizio di sincronizzazione tra il terminale e il server si era bloccato. Il terminale accumulava le timbrature in locale senza riuscire a trasmetterle.",
-    "resolution_steps": [
-      "Riavvio del servizio di sincronizzazione sul server",
-      "Forzatura della sincronizzazione per recuperare le timbrature accumulate nel weekend",
-      "Verifica che tutte le timbrature fossero state importate",
-      "Aggiunta di un monitor che segnala se la sincronizzazione non avviene entro 30 minuti"
-    ],
-    "impact": "Timbrature di 2 giorni da verificare e importare manualmente. Nessun dato perso (buffer locale del terminale).",
-    "detection": "Responsabile HR ha notato che le presenze del lunedì erano tutte vuote.",
-    "created_at": "2025-09-15T09:30:00",
-    "resolved_at": "2025-09-15T11:00:00"
-  },
-  {
-    "id": "INC-031",
-    "title": "Condizionamento sala server: temperatura alta",
-    "description": "Il monitoraggio ambientale della sala server segnala temperatura a 32 gradi (soglia di allarme: 28). Il condizionatore della sala server non sta raffreddando. Si sente il compressore ma non esce aria fredda.",
-    "category": "infrastructure",
-    "severity": "SEV2",
-    "root_cause": "Perdita di gas refrigerante dal condizionatore dedicato alla sala server. Il condizionatore aveva 6 anni e non era mai stato ricaricato.",
-    "resolution_steps": [
-      "Apertura delle porte della sala server come misura temporanea",
-      "Posizionamento di un condizionatore portatile di emergenza",
-      "Chiamata al tecnico per la ricarica del gas (intervento il giorno dopo)",
-      "Pianificazione di manutenzione annuale del condizionatore"
-    ],
-    "impact": "Rischio surriscaldamento server per 18 ore (fino all'intervento tecnico). Nessun guasto ma situazione critica.",
-    "detection": "Alert del sensore di temperatura.",
-    "created_at": "2025-10-10T15:00:00",
-    "resolved_at": "2025-10-11T09:00:00"
-  },
-  {
-    "id": "INC-032",
-    "title": "ERP: errore nel calcolo dei costi di produzione",
-    "description": "Il modulo di produzione dell'ERP calcola costi palesemente errati per i nuovi ordini. I prezzi mostrati sono circa il doppio del previsto. Il problema riguarda solo i prodotti inseriti nell'ultima settimana.",
-    "category": "application",
-    "severity": "SEV3",
-    "root_cause": "Un operatore aveva modificato per errore la tabella dei costi materie prime, raddoppiando il prezzo del polipropilene. L'errore non era stato notato perchè la modifica non richiedeva approvazione.",
-    "resolution_steps": [
-      "Correzione del prezzo nella tabella materie prime",
-      "Ricalcolo dei costi sugli ordini affetti",
-      "Aggiunta di un log delle modifiche alle tabelle di costo con notifica al responsabile",
-      "Verifica che nessuna offerta errata sia stata inviata ai clienti"
-    ],
-    "impact": "Preventivi errati per 3 giorni. Due offerte inviate con prezzi sbagliati da correggere con i clienti.",
-    "detection": "Il responsabile di produzione ha notato i costi anomali durante la pianificazione settimanale.",
-    "created_at": "2025-11-03T14:00:00",
-    "resolved_at": "2025-11-03T16:30:00"
-  },
-  {
-    "id": "INC-033",
-    "title": "Active Directory: utenti bloccati dopo cambio password policy",
-    "description": "Circa 15 utenti non riescono ad accedere ai PC questa mattina. Windows mostra account bloccato. Gli utenti non hanno sbagliato la password. Il problema si è presentato subito dopo l'applicazione della nuova policy di complessità password.",
-    "category": "security",
-    "severity": "SEV2",
-    "root_cause": "La nuova policy di lockout (3 tentativi falliti = blocco) era troppo aggressiva. Servizi e script che usavano credenziali salvate (vecchie password) hanno generato tentativi falliti, bloccando gli account.",
-    "resolution_steps": [
-      "Sblocco manuale degli account affetti",
-      "Identificazione dei servizi che usavano credenziali salvate e aggiornamento",
-      "Modifica della policy: soglia portata a 5 tentativi con reset automatico dopo 15 minuti",
-      "Comunicazione preventiva prima delle prossime modifiche alle policy"
-    ],
-    "impact": "15 utenti bloccati per 1-2 ore. Lavoro fermo per chi non poteva accedere.",
-    "detection": "Raffica di chiamate all'helpdesk all'apertura degli uffici.",
-    "created_at": "2025-11-18T08:00:00",
-    "resolved_at": "2025-11-18T10:30:00"
-  },
-  {
-    "id": "INC-034",
-    "title": "Bilancia industriale non comunica col gestionale",
-    "description": "La bilancia della zona ricevimento merci non trasmette più i pesi al gestionale. L'operatore deve inserire i pesi a mano, rallentando il processo di accettazione. La bilancia visualizza i pesi correttamente sul suo display.",
-    "category": "hardware",
-    "severity": "SEV3",
-    "root_cause": "Il convertitore seriale-USB che collegava la bilancia al PC si era guastato. Il PC non rilevava più la porta COM.",
-    "resolution_steps": [
-      "Sostituzione del convertitore seriale-USB",
-      "Reinstallazione del driver della porta COM",
-      "Test di trasmissione peso dalla bilancia al gestionale",
-      "Acquisto di un convertitore di scorta"
-    ],
-    "impact": "Inserimento manuale dei pesi per 1 giorno. Rallentamento dell'accettazione merci.",
-    "detection": "Segnalazione dell'operatore del ricevimento.",
-    "created_at": "2025-12-05T07:30:00",
-    "resolved_at": "2025-12-05T14:00:00"
-  },
-  {
-    "id": "INC-035",
-    "title": "Connessione internet aziendale assente",
-    "description": "Tutta l'azienda è senza internet da stamattina. La rete interna funziona (si raggiungono server e stampanti) ma nessun sito web si apre e le email esterne non arrivano. Il router del provider mostra tutte le spie accese normalmente.",
-    "category": "network",
-    "severity": "SEV1",
-    "root_cause": "Guasto sulla linea del provider. Un intervento di scavo nella zona industriale aveva tranciato la fibra ottica.",
-    "resolution_steps": [
-      "Contatto con il provider per segnalare il guasto",
-      "Il provider ha confermato il guasto alla fibra e stimato 6 ore per la riparazione",
-      "Attivazione della SIM 4G di backup sul router secondario come connessione temporanea",
-      "Comunicazione a tutti i reparti della situazione e dei tempi stimati",
-      "Ripristino completo dopo l'intervento del provider"
-    ],
-    "impact": "Internet assente per 5 ore (2 ore senza connettività, poi backup 4G con banda limitata). Email esterne in ritardo.",
-    "detection": "Segnalazioni da tutti i reparti contemporaneamente.",
-    "created_at": "2025-12-15T08:00:00",
-    "resolved_at": "2025-12-15T13:00:00"
+    "status": "open",
+    "created_at": "2026-06-12T11:30:00"
   }
 ]

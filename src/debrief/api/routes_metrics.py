@@ -13,6 +13,6 @@ router = APIRouter(tags=["metrics"])
 
 @router.get("/metrics")
 def metrics(user: dict = Depends(auth.current_user)):
-    """Conteggi (per status/severity/category), totale e MTTR (secondi)."""
+    """Conteggi (per status/severity), totale e MTTR (secondi)."""
     # Route sottile: delega tutto il calcolo al service layer e restituisce il dict.
     return service.get_metrics()

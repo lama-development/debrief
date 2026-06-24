@@ -2,7 +2,7 @@
 triage.py - Agente di triage per la classificazione degli incidenti.
 
 Riceve una descrizione in linguaggio naturale e produce un TriageOutput strutturato:
-categoria, severità, team da coinvolgere, summary, eventuali domande di chiarimento.
+severità, team da coinvolgere, summary, eventuali domande di chiarimento.
 
 È il primo dei tre agenti "di sostanza". A differenza di investigator e resolver,
 il triage produce un OGGETTO STRUTTURATO (TriageOutput) e non prosa: per questo
@@ -58,7 +58,7 @@ def build_system_prompt(teams: list[dict]) -> str:
     4. The summary should be a concise, neutral description of the incident suitable for a chat message.
     5. Set confidence between 0.0 and 1.0 to reflect how certain you are about the classification.
     6. Respond ONLY with the structured output. No extra text, no explanations.
-    7. Always respond in Italian for the summary and clarifying_questions fields. The category and severity use the English enum values."""
+    7. Always respond in Italian for the summary and clarifying_questions fields. The severity uses the English enum value (SEV1-SEV4)."""
 
 
 def create_triage_agent(teams: list[dict]) -> Agent:

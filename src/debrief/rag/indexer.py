@@ -39,7 +39,6 @@ def _incident_record(inc: dict, vec: list[float]) -> dict:
     return {
         "id": inc["id"],
         "title": inc["title"],
-        "category": inc.get("category", ""),
         "severity": inc.get("severity", ""),
         "text": _build_incident_text(inc),  # il testo che è stato incorporato
         "root_cause": inc.get("root_cause", ""),

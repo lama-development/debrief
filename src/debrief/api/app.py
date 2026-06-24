@@ -11,7 +11,6 @@ Avvio:
     uv run uvicorn src.debrief.api.app:app --reload
 """
 
-import os
 # asynccontextmanager: serve a creare la funzione `lifespan` (vedi sotto), che
 # definisce cosa fare all'avvio e allo spegnimento dell'app.
 from contextlib import asynccontextmanager
@@ -26,12 +25,8 @@ from debrief.database import get_connection, create_tables
 from debrief.api import routes_auth, routes_incidents, routes_chat, routes_metrics
 
 
-def _cors_origins() -> list[str]:
-    """Origini consentite per il CORS (frontend dev). Configurabile via env."""
-    raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
-    # split(",") spezza la stringa sugli a-capo virgola; .strip() toglie spazi;
-    # `if o.strip()` scarta eventuali pezzi vuoti. Risultato: lista di URL puliti.
-    return [o.strip() for o in raw.split(",") if o.strip()]
+# Origini consentite per il CORS: gli URL del frontend in sviluppo (Vite usa 5173).
+CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
 
 
 # @asynccontextmanager + funzione con `yield` = "lifespan" di FastAPI. Tutto ciò
@@ -59,7 +54,7 @@ app = FastAPI(
 # invece sono ristrette a quelle del frontend. Un middleware "avvolge" ogni richiesta.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins(),
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -86,8 +81,8 @@ def main():
     import uvicorn   # uvicorn è il server che esegue l'app FastAPI
 
     uvicorn.run(
-        "debrief.api.app:app",                       # "modulo:oggetto" dell'app
-        host=os.getenv("API_HOST", "127.0.0.1"),
-        port=int(os.getenv("API_PORT", "8000")),     # env è testo → int() lo converte
-        reload=True,                                 # riavvio automatico al salvataggio (dev)
+        "debrief.api.app:app",   # "modulo:oggetto" dell'app
+        host="127.0.0.1",        # per cambiare host/porta modifica qui
+        port=8000,
+        reload=True,             # riavvio automatico al salvataggio (dev)
     )

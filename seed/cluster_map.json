@@ -1,33 +1,13 @@
 {
-  "_note": "Questa mappa è la GROUND TRUTH per la valutazione del retrieval. Ogni cluster raggruppa incidenti che descrivono lo stesso tipo di problema con parole diverse. L'investigator deve recuperare i membri dello stesso cluster come simili.",
+  "_note": "Questa mappa è la GROUND TRUTH per la valutazione del retrieval. Ogni cluster raggruppa incidenti RISOLTI che descrivono lo stesso tipo di problema con parole diverse. L'investigator deve recuperare i membri dello stesso cluster come simili. Solo gli incidenti risolti finiscono nel RAG (past_incidents).",
   "clusters": {
-    "db_connection_pool": {
-      "description": "Problemi di connessione al database sotto carico",
-      "incident_ids": ["INC-001", "INC-002", "INC-003"]
-    },
-    "network_latency": {
-      "description": "Latenza di rete anomala o perdita pacchetti",
-      "incident_ids": ["INC-004", "INC-005", "INC-006"]
-    },
     "plc_error": {
       "description": "Errori PLC o fermi macchinario in produzione",
-      "incident_ids": ["INC-007", "INC-008", "INC-009", "INC-010"]
+      "incident_ids": ["INC-001", "INC-002", "INC-003"]
     },
-    "disk_full": {
-      "description": "Disco pieno su server o appliance",
-      "incident_ids": ["INC-011", "INC-012", "INC-013"]
-    },
-    "email_client": {
-      "description": "Problemi client di posta (Outlook, sincronizzazione)",
-      "incident_ids": ["INC-014", "INC-015", "INC-016"]
-    },
-    "deploy_failure": {
-      "description": "Deploy falliti o rollback necessari",
-      "incident_ids": ["INC-017", "INC-018", "INC-019"]
-    },
-    "vpn_access": {
-      "description": "Problemi di connessione VPN",
-      "incident_ids": ["INC-020", "INC-021", "INC-022"]
+    "db_connection_pool": {
+      "description": "Problemi di connessione al database sotto carico",
+      "incident_ids": ["INC-004", "INC-005", "INC-006"]
     }
   }
 }
