@@ -14,8 +14,8 @@
     ],
     "impact": "Linea 2 ferma per 6 ore. Circa 2000 pezzi non prodotti.",
     "detection": "Allarme sul quadro operatore e segnalazione immediata del capoturno.",
-    "created_at": "2025-01-28T06:15:00",
-    "resolved_at": "2025-01-28T12:30:00"
+    "created_at": "2025-01-15T06:15:00",
+    "resolved_at": "2025-01-15T12:30:00"
   },
   {
     "id": "INC-002",
@@ -32,8 +32,8 @@
     ],
     "impact": "Supervisione cieca sulla linea di estrusione per 3 ore. Rischio qualità.",
     "detection": "Operatore SCADA ha notato i valori fermi a schermo.",
-    "created_at": "2025-03-18T13:40:00",
-    "resolved_at": "2025-03-18T16:50:00"
+    "created_at": "2025-01-28T13:40:00",
+    "resolved_at": "2025-01-28T16:50:00"
   },
   {
     "id": "INC-003",
@@ -51,8 +51,8 @@
     ],
     "impact": "Linea 1 ferma per un'intera giornata. Produzione spostata sulle altre linee con straordinari.",
     "detection": "Capoturno del mattino ha trovato la linea in errore all'accensione.",
-    "created_at": "2025-07-15T05:30:00",
-    "resolved_at": "2025-07-15T17:00:00"
+    "created_at": "2025-02-03T05:30:00",
+    "resolved_at": "2025-02-03T17:00:00"
   },
   {
     "id": "INC-004",
@@ -68,8 +68,8 @@
     ],
     "impact": "Tutti gli utenti dell'ERP (circa 30 persone) hanno avuto rallentamenti per 3 ore. Nessun dato perso.",
     "detection": "Segnalazione degli utenti dell'ufficio acquisti.",
-    "created_at": "2025-01-15T08:30:00",
-    "resolved_at": "2025-01-15T11:45:00"
+    "created_at": "2025-03-18T08:30:00",
+    "resolved_at": "2025-03-18T11:45:00"
   },
   {
     "id": "INC-005",
@@ -120,8 +120,8 @@
     ],
     "impact": "Tutti i servizi di rete giù per 1.5 ore. Nessuno poteva stampare, accedere ai file condivisi o ottenere un IP.",
     "detection": "Segnalazioni multiple da tutti i reparti all'apertura degli uffici.",
-    "created_at": "2025-02-03T08:00:00",
-    "resolved_at": "2025-02-03T09:30:00"
+    "created_at": "2025-07-15T08:00:00",
+    "resolved_at": "2025-07-15T09:30:00"
   },
   {
     "id": "INC-008",
