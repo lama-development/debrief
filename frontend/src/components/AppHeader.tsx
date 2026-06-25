@@ -23,11 +23,12 @@ export function AppHeader() {
           <img src="/Debrief-Dark.png" alt="" className="h-6 hidden dark:block" />
           Debrief
         </Link>
-        <div className="flex items-center gap-3">
-          {user && <span className="text-sm text-muted-foreground">{user.username}</span>}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {user && <span className="hidden sm:inline text-sm text-muted-foreground">{user.username}</span>}
           <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={onLogout}>
-            <LogOut className="h-4 w-4" /> Esci
+          <Button variant="ghost" size="icon" className="sm:w-auto sm:px-3" onClick={onLogout} aria-label="Esci">
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1.5">Esci</span>
           </Button>
         </div>
       </div>

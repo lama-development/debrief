@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
@@ -12,6 +13,7 @@ import { StatusBadge } from "@/components/StatusBadge"
 import { Timeline } from "@/components/Timeline"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 import { useIncident, useReopenIncident } from "@/hooks/useIncident"
 import { ApiError } from "@/lib/api"
 import type { IncidentStatus, PostMortem } from "@/lib/types"
@@ -23,6 +25,7 @@ export function IncidentDetailPage() {
   const qc = useQueryClient()
   const { data: incident, isLoading, isError } = useIncident(id)
   const reopen = useReopenIncident(id)
+  const [mobileTab, setMobileTab] = useState<"chat" | "details">("chat")
 
   if (isLoading) {
     return (
@@ -55,28 +58,36 @@ export function IncidentDetailPage() {
   const isResolved = incident.status === "resolved"
 
   return (
-    <div className="flex h-screen flex-col bg-muted/30">
+    <div className="flex h-svh flex-col bg-muted/30">
       <AppHeader />
 
       {/* Intestazione incidente */}
       <div className="container pt-4">
         <Card className="px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Torna alla dashboard">
-                <Link to="/">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
-              <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold tracking-tight">{incident.title}</h1>
-                <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Torna alla dashboard">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-semibold tracking-tight leading-tight line-clamp-2">{incident.title}</h1>
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <div className="flex items-center gap-2">
                   <StatusBadge status={incident.status} />
                   <SeverityBadge severity={incident.severity} />
                 </div>
+                <div className="flex items-center gap-2 shrink-0 sm:hidden">
+                  {canResolve && <ResolveDialog incidentId={incident.id} />}
+                  {isResolved && (
+                    <Button variant="outline" size="sm" onClick={onReopen} disabled={reopen.isPending}>
+                      Riapri
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:flex items-center gap-2 shrink-0">
               {canResolve && <ResolveDialog incidentId={incident.id} />}
               {isResolved && (
                 <Button variant="outline" onClick={onReopen} disabled={reopen.isPending}>
@@ -89,64 +100,90 @@ export function IncidentDetailPage() {
       </div>
 
       {/* Due pannelli: dettaglio (sinistra) + chat (destra) */}
-      <div className="container grid min-h-0 flex-1 grid-cols-1 gap-4 py-4 lg:grid-cols-[2fr_3fr]">
-        {/* Sinistra: descrizione, timeline, remediation, post-mortem */}
-        <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Descrizione</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap text-sm text-foreground/90">{incident.description}</p>
-            </CardContent>
-          </Card>
+      <div className="container min-h-0 flex-1 flex flex-col gap-4 py-4">
+        {/* Selettore tab — visibile solo sotto lg */}
+        <div className="flex rounded-lg bg-muted p-1 text-sm font-medium lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileTab("chat")}
+            className={cn(
+              "flex-1 rounded-md py-1.5 transition-colors",
+              mobileTab === "chat" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Chat
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("details")}
+            className={cn(
+              "flex-1 rounded-md py-1.5 transition-colors",
+              mobileTab === "details" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Dettagli
+          </button>
+        </div>
 
-          {incident.post_mortem && <PostMortemCard pm={incident.post_mortem} />}
-
-          {incident.remediation.length > 0 && (
+        <div className="min-h-0 flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+          {/* Sinistra: descrizione, timeline, remediation, post-mortem */}
+          <div className={cn("min-h-0 space-y-4 overflow-y-auto pr-1", mobileTab !== "details" && "hidden lg:block")}>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Remediation</CardTitle>
+                <CardTitle className="text-base">Descrizione</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
-                  {incident.remediation.map((step) => (
-                    <li key={step.id} className="flex items-start gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <div>
-                        <span>{step.description}</span>
-                        <span className="ml-2 text-sm text-muted-foreground">[{step.source}]</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <p className="whitespace-pre-wrap text-sm text-foreground/90">{incident.description}</p>
               </CardContent>
             </Card>
-          )}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Timeline events={incident.timeline} />
+            {incident.post_mortem && <PostMortemCard pm={incident.post_mortem} />}
+
+            {incident.remediation.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Remediation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm">
+                    {incident.remediation.map((step) => (
+                      <li key={step.id} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                        <div>
+                          <span>{step.description}</span>
+                          <span className="ml-2 text-sm text-muted-foreground">[{step.source}]</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Timeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Timeline events={incident.timeline} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Destra: chat */}
+          <Card className={cn("flex min-h-0 flex-col overflow-hidden", mobileTab !== "chat" && "hidden lg:flex")}>
+            <CardContent className="min-h-0 flex-1 p-0">
+              <ChatPanel
+                key={incident.id}
+                incidentId={incident.id}
+                status={incident.status}
+                initialEvents={incident.timeline}
+                initialDraft={incident.status === "open" ? incident.description : ""}
+                onTurnComplete={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
+              />
             </CardContent>
           </Card>
         </div>
-
-        {/* Destra: chat */}
-        <Card className="flex min-h-0 flex-col overflow-hidden">
-          <CardContent className="min-h-0 flex-1 p-0">
-            <ChatPanel
-              key={incident.id}
-              incidentId={incident.id}
-              status={incident.status}
-              initialEvents={incident.timeline}
-              initialDraft={incident.status === "open" ? incident.description : ""}
-              onTurnComplete={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
-            />
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

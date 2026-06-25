@@ -217,7 +217,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       >
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </span>
-      <div className={cn("max-w-[80%] space-y-2", isUser ? "items-end text-right" : "items-start")}>
+      <div className={cn("max-w-[80%] space-y-2", isUser ? "items-end" : "items-start")}>
         {!isUser && message.agent && (
           <div className="text-sm font-medium text-muted-foreground">
             {identity.label}

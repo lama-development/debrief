@@ -55,7 +55,7 @@ uv sync
 ### 3. Popola il database con dati di seed
 
 ```bash
-uv run python seed/run_seed.py
+uv run seed
 ```
 
 ### 4. Avvia backend e frontend

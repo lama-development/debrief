@@ -156,12 +156,5 @@
     "severity": "SEV3",
     "status": "active",
     "created_at": "2026-06-12T10:00:00"
-  },
-  {
-    "id": "INC-011",
-    "title": "Telefoni VoIP del commerciale: nessun audio nelle chiamate",
-    "description": "I telefoni VoIP dell'ufficio commerciale squillano e si connettono ma non c'è audio in nessuna direzione. Il problema riguarda solo i 6 telefoni del commerciale, gli altri reparti funzionano. I telefoni hanno IP nella stessa subnet.",
-    "status": "open",
-    "created_at": "2026-06-12T11:30:00"
   }
 ]

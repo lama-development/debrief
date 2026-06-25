@@ -7,7 +7,7 @@ export function StatusBadge({ status, className }: { status: IncidentStatus; cla
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium shadow-sm",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium shadow-sm whitespace-nowrap",
         STATUS_CLASS[status] ?? "border border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-500/30 dark:bg-slate-500/15 dark:text-slate-200",
         className,
       )}

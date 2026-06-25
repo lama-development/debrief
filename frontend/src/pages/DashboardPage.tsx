@@ -47,7 +47,7 @@ export function DashboardPage() {
       <AppHeader />
       <main className="container space-y-6 py-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Dashboard</h1>
           <NewIncidentDialog />
         </div>
 
@@ -69,7 +69,7 @@ export function DashboardPage() {
         </div>
 
         {/* Filtro per stato */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible [&>*]:shrink-0">
           <FilterChip label="Tutti" active={filter === undefined} onClick={() => setFilter(undefined)} />
           {ALL_STATUSES.map((s) => (
             <FilterChip
@@ -88,11 +88,11 @@ export function DashboardPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className={cn(TH, "w-28")}>ID</th>
+                    <th className={cn(TH, "hidden w-28 sm:table-cell")}>ID</th>
                     <th className={TH}>Titolo</th>
-                    <th className={cn(TH, "w-40")}>Severità</th>
+                    <th className={cn(TH, "hidden w-40 md:table-cell")}>Severità</th>
                     <th className={cn(TH, "w-36")}>Stato</th>
-                    <th className={cn(TH, "w-40")}>Creato</th>
+                    <th className={cn(TH, "hidden w-40 md:table-cell")}>Creato</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -123,15 +123,15 @@ export function DashboardPage() {
                       className="cursor-pointer border-b last:border-b-0 hover:bg-muted/50"
                       onClick={() => navigate(`/incidents/${inc.id}`)}
                     >
-                      <td className={cn(TD, "font-mono text-sm")}>{inc.id}</td>
+                      <td className={cn(TD, "hidden font-mono text-sm sm:table-cell")}>{inc.id}</td>
                       <td className={cn(TD, "font-medium")}>{inc.title}</td>
-                      <td className={TD}>
+                      <td className={cn(TD, "hidden md:table-cell")}>
                         <SeverityBadge severity={inc.severity} />
                       </td>
                       <td className={TD}>
                         <StatusBadge status={inc.status} />
                       </td>
-                      <td className={cn(TD, "text-sm text-muted-foreground")}>
+                      <td className={cn(TD, "hidden text-sm text-muted-foreground md:table-cell")}>
                         {formatDateTime(inc.created_at)}
                       </td>
                     </tr>
