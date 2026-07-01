@@ -235,17 +235,10 @@ dependencies = [
     { name = "fastapi" },
     { name = "groq" },
     { name = "lancedb" },
-    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "sentence-transformers" },
     { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -260,16 +253,12 @@ requires-dist = [
     { name = "bcrypt" },
     { name = "fastapi" },
     { name = "groq" },
-    { name = "httpx", marker = "extra == 'dev'" },
     { name = "lancedb" },
-    { name = "pyarrow" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'" },
     { name = "python-dotenv" },
     { name = "sentence-transformers" },
     { name = "uvicorn", extras = ["standard"] },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -8,8 +8,8 @@ Esegue quattro suite di test, una per ciascuna capacita' chiave del sistema:
   3. retrieval - qualita' del RAG (precision/recall/MRR sui cluster di ground truth)
   4. injection - robustezza alla prompt injection (red-team, metrica di sicurezza)
 
-I dataset stanno nei file test_*.json accanto a questo script. La ground truth del
-retrieval e' seed/cluster_map.json.
+I pochi casi rappresentativi e la ground truth del retrieval stanno nell'unico
+file cases.json.
 
 Uso:
     uv run python eval/run_eval.py            # tutte le suite
@@ -27,6 +27,8 @@ Note:
 import os
 import sys
 import json
+import re
+import time
 
 # Su Windows il terminale usa spesso cp1252 e va in errore sulle emoji (🟣🔵...).
 # Forziamo stdout/stderr in UTF-8 cosi' il report gira in qualsiasi terminale.
@@ -36,14 +38,15 @@ for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8")
 
-# Aggiunge src/ al path di import, esattamente come fanno seed/run_seed.py e gli
-# script in scripts/: cosi' `import debrief...` funziona lanciando questo file
+# Aggiunge src/ al path di import, come seed/run_seed.py: così `import debrief...`
+# funziona anche lanciando questo file direttamente
 # direttamente con `uv run python eval/run_eval.py`.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-# Cartella che contiene questo script e i dataset test_*.json.
+# Cartella che contiene runner e dataset unico.
 EVAL_DIR = os.path.dirname(__file__)
 SEED_DIR = os.path.join(EVAL_DIR, "..", "seed")
+CASES_PATH = os.path.join(EVAL_DIR, "cases.json")
 
 
 # Helper generici
@@ -69,6 +72,21 @@ def _line(passed: bool, label: str, detail: str = "") -> None:
     print(f"   {mark} {label}{(' - ' + detail) if detail else ''}")
 
 
+def _require_vector_tables() -> None:
+    """Blocca le suite RAG con un errore chiaro se il seed non è stato eseguito."""
+    from debrief.rag.indexer import get_db
+
+    # verified_solutions nasce a runtime quando arriva il primo contributo umano;
+    # non fa parte del seed iniziale.
+    required = {"past_incidents", "knowledge_base"}
+    available = set(get_db().list_tables().tables)
+    missing = required - available
+    if missing:
+        raise RuntimeError(
+            f"Tabelle LanceDB mancanti: {sorted(missing)}. Eseguire prima `uv run seed`."
+        )
+
+
 # Suite 1: TRIAGE
 def eval_triage() -> dict:
     """Valuta severita' e gestione dei casi vaghi del Triage Agent.
@@ -79,7 +97,7 @@ def eval_triage() -> dict:
     """
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
 
-    data = _load_json(os.path.join(EVAL_DIR, "test_triage.json"))
+    data = _load_json(CASES_PATH)["triage"]
     teams = _load_json(os.path.join(SEED_DIR, "teams.json"))
     valid_team_ids = {t["id"] for t in teams}
 
@@ -90,6 +108,8 @@ def eval_triage() -> dict:
     sev_exact = sev_within1 = 0     # accuratezza severita' (solo casi-incidente)
     clar_total = clar_ok = 0        # correttezza del flag needs_clarification (tutti i casi)
     teams_violations = 0            # team suggeriti fuori catalogo dopo validate_teams (deve restare 0)
+    execution_failures = 0
+    confusion: dict[str, dict[str, int]] = {}
 
     print("\n🟣 SUITE: Triage (severita')\n")
 
@@ -100,21 +120,20 @@ def eval_triage() -> dict:
 
         is_incident = case["expected_severity"] is not None
 
+        if result is None:
+            execution_failures += 1
+            _line(False, case["id"], "esecuzione fallita (rete, rate limit o output non valido)")
+            continue
+
         # needs_clarification si valuta su TUTTI i casi.
         clar_total += 1
-        got_clar = bool(result.needs_clarification) if result else True
+        got_clar = bool(result.needs_clarification)
         clar_match = got_clar == case["expected_needs_clarification"]
         clar_ok += int(clar_match)
 
         if not is_incident:
             # Caso vago/non-incidente: ci basta che chieda chiarimenti.
             _line(clar_match, case["id"], f"needs_clarification atteso={case['expected_needs_clarification']} ottenuto={got_clar}")
-            continue
-
-        if result is None:
-            # Il triage ha fallito la classificazione: conta come errore su severita'.
-            inc_total += 1
-            _line(False, case["id"], "triage ha restituito None (classificazione fallita)")
             continue
 
         inc_total += 1
@@ -125,6 +144,10 @@ def eval_triage() -> dict:
         sev_close = abs(_sev_to_int(got_sev) - _sev_to_int(case["expected_severity"])) <= 1
         sev_exact += int(sev_match)
         sev_within1 += int(sev_close)
+        expected_sev = case["expected_severity"]
+        confusion.setdefault(expected_sev, {})[got_sev] = (
+            confusion.setdefault(expected_sev, {}).get(got_sev, 0) + 1
+        )
 
         # Guardrail: nessun team fuori catalogo deve sopravvivere a validate_teams.
         if any(t not in valid_team_ids for t in result.suggested_teams):
@@ -138,12 +161,15 @@ def eval_triage() -> dict:
         "severity_within_1": _pct(sev_within1, inc_total),
         "clarification_accuracy": _pct(clar_ok, clar_total),
         "team_catalog_violations": teams_violations,
+        "severity_confusion_matrix": confusion,
+        "execution_failures": execution_failures,
     }
     print()
     print(f"   Severita' (esatta):        {metrics['severity_exact']:.0f}%  ({sev_exact}/{inc_total})")
     print(f"   Severita' (+/-1 livello):  {metrics['severity_within_1']:.0f}%  ({sev_within1}/{inc_total})")
     print(f"   Chiarimenti (corretti):    {metrics['clarification_accuracy']:.0f}%  ({clar_ok}/{clar_total})")
     print(f"   Violazioni catalogo team:  {teams_violations} (atteso 0)")
+    print(f"   Fallimenti di esecuzione:  {execution_failures}")
     return metrics
 
 
@@ -152,10 +178,11 @@ def eval_routing() -> dict:
     """Valuta l'Orchestrator: dato messaggio + stato incidente, sceglie l'agente giusto?"""
     from debrief.agents.orchestrator import create_router_agent, route_message
 
-    data = _load_json(os.path.join(EVAL_DIR, "test_routing.json"))
+    data = _load_json(CASES_PATH)["routing"]
     router = create_router_agent()
 
-    total = ok = 0
+    total = ok = fallbacks = 0
+    confusion: dict[str, dict[str, int]] = {}
     print("\n🟣 SUITE: Routing (orchestrator)\n")
 
     for case in data["cases"]:
@@ -167,17 +194,68 @@ def eval_routing() -> dict:
         )
         got = decision.agent.value
         match = got == case["expected_agent"]
+        is_fallback = decision.reason.startswith("fallback:")
+        fallbacks += int(is_fallback)
         total += 1
         ok += int(match)
+        expected = case["expected_agent"]
+        confusion.setdefault(expected, {})[got] = confusion.setdefault(expected, {}).get(got, 0) + 1
         _line(match, case["id"], f"[{case['incident_status']}] atteso={case['expected_agent']} ottenuto={got}")
 
-    metrics = {"routing_accuracy": _pct(ok, total)}
+    metrics = {
+        "routing_accuracy": _pct(ok, total),
+        "fallback_count": fallbacks,
+        "confusion_matrix": confusion,
+    }
     print()
     print(f"   Accuratezza routing:  {metrics['routing_accuracy']:.0f}%  ({ok}/{total})")
     return metrics
 
 
-# Suite 3: RETRIEVAL
+# Suite 3: RESOLVER
+def eval_resolver() -> dict:
+    """Misura groundedness delle citazioni e recupero di almeno una fonte attesa."""
+    from debrief.agents.resolver import create_resolver_agent, resolve
+
+    _require_vector_tables()
+    data = _load_json(CASES_PATH)["resolver"]
+    incidents = _load_json(os.path.join(SEED_DIR, "incidents.json"))
+    valid_ids = {item["id"] for item in incidents}
+    agent = create_resolver_agent()
+    agent.model.temperature = 0
+
+    total = grounded = expected_hit = cited_any = execution_failures = 0
+    print("\n🟣 SUITE: Resolver (groundedness e provenance)\n")
+    for case in data["cases"]:
+        output = resolve(agent, case["description"])
+        if output.startswith("Resolution failed:"):
+            execution_failures += 1
+            _line(False, case["id"], "esecuzione fallita")
+            continue
+        cited = set(re.findall(r"\b(?:INC|VS)-\d{3}\b", output.upper()))
+        unknown = cited - valid_ids
+        expected = set(case["expected_any_ids"])
+        is_grounded = not unknown
+        has_expected = bool(cited & expected)
+        grounded += int(is_grounded)
+        expected_hit += int(has_expected)
+        cited_any += int(bool(cited))
+        total += 1
+        _line(
+            is_grounded and has_expected,
+            case["id"],
+            f"citate={sorted(cited)} sconosciute={sorted(unknown)}",
+        )
+
+    return {
+        "grounded_citation_rate": _pct(grounded, total),
+        "expected_source_hit_rate": _pct(expected_hit, total),
+        "citation_rate": _pct(cited_any, total),
+        "execution_failures": execution_failures,
+    }
+
+
+# Suite 4: RETRIEVAL
 def eval_retrieval() -> dict:
     """Valuta il RAG sugli incidenti passati usando i cluster come ground truth.
 
@@ -187,7 +265,8 @@ def eval_retrieval() -> dict:
     from debrief.config import SIMILARITY_THRESHOLD
     from debrief.rag.retriever import retrieve_similar_incidents
 
-    data = _load_json(os.path.join(EVAL_DIR, "test_retrieval.json"))
+    _require_vector_tables()
+    data = _load_json(CASES_PATH)["retrieval"]
     k = data.get("top_k", 5)
 
     sum_prec = sum_rec = sum_mrr = 0.0
@@ -241,7 +320,55 @@ def eval_retrieval() -> dict:
     return metrics
 
 
-# Suite 4: INJECTION (red-team)
+# Suite 5: LEARNING LOOP
+def eval_learning_loop() -> dict:
+    """Verifica che una soluzione umana diventi recuperabile dopo la cattura."""
+    import tempfile
+
+    from debrief.config import SIMILARITY_THRESHOLD
+    from debrief.rag.indexer import add_verified_solution, get_db, search
+    from debrief.tools.embedding import embed_text
+
+    query = "FortiClient rifiuta la VPN perché il certificato client è scaduto"
+    unrelated = {
+        "id": "VS-UNRELATED",
+        "incident_id": "INC-X",
+        "problem_context": "Stampante senza carta",
+        "solution": "Caricare un nuovo rotolo di etichette",
+        "provided_by": "test",
+    }
+    learned = {
+        "id": "VS-LEARNED",
+        "incident_id": "INC-Y",
+        "problem_context": query,
+        "solution": "Rigenerare e distribuire il certificato client FortiClient",
+        "provided_by": "human-expert",
+    }
+
+    with tempfile.TemporaryDirectory() as directory:
+        database = get_db(directory)
+        unrelated_text = unrelated["problem_context"] + " " + unrelated["solution"]
+        add_verified_solution(database, unrelated, embed_text(unrelated_text))
+        query_vector = embed_text(query)
+        before = search(
+            database, "verified_solutions", query_vector, k=3,
+            threshold=SIMILARITY_THRESHOLD,
+        )
+        learned_text = learned["problem_context"] + " " + learned["solution"]
+        add_verified_solution(database, learned, embed_text(learned_text))
+        after = search(
+            database, "verified_solutions", query_vector, k=3,
+            threshold=SIMILARITY_THRESHOLD,
+        )
+
+    before_ids = {item["id"] for item in before}
+    after_ids = {item["id"] for item in after}
+    passed = learned["id"] not in before_ids and learned["id"] in after_ids
+    _line(passed, "human-knowledge-loop", f"prima={sorted(before_ids)} dopo={sorted(after_ids)}")
+    return {"learning_loop_success": 100.0 if passed else 0.0}
+
+
+# Suite 6: INJECTION (red-team)
 def eval_injection() -> dict:
     """Valuta la robustezza alla prompt injection.
 
@@ -252,7 +379,7 @@ def eval_injection() -> dict:
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
     from debrief.agents.orchestrator import create_router_agent, route_message
 
-    data = _load_json(os.path.join(EVAL_DIR, "test_injection.json"))
+    data = _load_json(CASES_PATH)["injection"]
     teams = _load_json(os.path.join(SEED_DIR, "teams.json"))
     valid_team_ids = {t["id"] for t in teams}
 
@@ -306,7 +433,9 @@ def eval_injection() -> dict:
 SUITES = {
     "triage":    {"fn": eval_triage,    "llm": True},
     "routing":   {"fn": eval_routing,   "llm": True},
+    "resolver":  {"fn": eval_resolver,  "llm": True},
     "retrieval": {"fn": eval_retrieval, "llm": False},
+    "learning":  {"fn": eval_learning_loop, "llm": False},
     "injection": {"fn": eval_injection, "llm": True},
 }
 
@@ -321,8 +450,7 @@ def main() -> None:
         sys.exit(2)
 
     # Se manca la chiave Groq, le suite LLM non possono girare: le segnaliamo.
-    from debrief.config import GROQ_API_KEY
-    have_key = bool(GROQ_API_KEY)
+    have_key = bool(os.getenv("GROQ_API_KEY"))
 
     print("\n🟣 ============================================")
     print("🟣  Debrief - Valutazione automatica")
@@ -338,7 +466,9 @@ def main() -> None:
         if suite["llm"] and not have_key:
             skipped.append(name)
             continue
+        started = time.perf_counter()
         summary[name] = suite["fn"]()
+        summary[name]["duration_seconds"] = round(time.perf_counter() - started, 2)
 
     # Riepilogo finale compatto.
     print("\n🟣 ============================================")
@@ -353,6 +483,14 @@ def main() -> None:
     for name in skipped:
         print(f"   🔵 {name}: SALTATA (manca GROQ_API_KEY)")
     print()
+
+    incomplete = sum(
+        int(metrics.get("execution_failures", 0)) + int(metrics.get("fallback_count", 0))
+        for metrics in summary.values()
+    )
+    if incomplete:
+        print(f"🔴 Valutazione incompleta: {incomplete} esecuzioni LLM fallite o in fallback.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

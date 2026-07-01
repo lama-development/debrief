@@ -41,7 +41,6 @@ debrief/
 │   └── auth.py                  # hashing bcrypt, token di sessione, current_user
 ├── seed/
 │   ├── incidents.json           # incidenti mock con cluster
-│   ├── verified_solutions.json  # soluzioni umane di esempio
 │   ├── teams.json               # catalogo team
 │   ├── knowledge_base/          # runbook markdown
 │   │   ├── db_failover.md
@@ -49,14 +48,12 @@ debrief/
 │   │   ├── plc_error_handling.md
 │   │   ├── email_client_issues.md
 │   │   └── disk_space_management.md
-│   ├── cluster_map.json         # GROUND TRUTH: quale incidente appartiene a quale cluster
 │   └── run_seed.py              # popola SQLite + LanceDB
 ├── eval/
-│   ├── test_triage.json         # descrizioni con severità/categoria attese
-│   ├── test_routing.json        # messaggi con agente atteso
-│   ├── test_retrieval.json      # query con incidenti simili attesi (da cluster_map)
-│   ├── test_injection.json      # input ostili (red-team)
-│   └── run_eval.py              # uv run eval
+│   ├── cases.json               # pochi casi rappresentativi per tutte le suite AI
+│   ├── smoke_demo.py            # demo end-to-end su database temporanei
+│   ├── run_eval.py              # unico runner delle metriche AI (`uv run eval`)
+│   └── __init__.py
 ├── frontend/                    # React + shadcn (ULTIMO)
 └── data/                        # generato a runtime, in .gitignore
     ├── debrief.db               # SQLite
@@ -84,7 +81,6 @@ class IncidentStatus(str, Enum):
 class TriageOutput(BaseModel):
     title: str
     severity: Severity
-    affected_systems: list[str]
     suggested_teams: list[str]       # SOLO valori dal catalogo team
     summary: str
     needs_clarification: bool
@@ -102,112 +98,87 @@ class PostMortem(BaseModel):
     title: str
     severity: Severity
     timeline: list[TimelineEvent]
-    impact: str
-    detection: str
-    root_cause: str
-    resolution_steps: list[str]
-    action_items: list[str]
-    references: list[str]            # id di incidenti/KB citati
+    resolution: str
 
 class VerifiedSolution(BaseModel):
+    id: str
     incident_id: str
     problem_context: str
     solution: str
     provided_by: str
     created_at: datetime
-
-class RemediationStep(BaseModel):
-    description: str
-    completed: bool = False
-    source: str                      # "verified_solution:#id" | "past_incident:#id" | "knowledge_base" | "general"
 ```
 
 ## Schema SQLite (src/debrief/database.py)
 
 ```
 users           (id, username, password_hash, created_at)
-incidents       (id, title, description, severity, status, created_by, created_at, updated_at, session_id)
+incidents       (id, title, description, severity, status, created_by, created_at, updated_at)
+incident_participants (incident_id, user_id, joined_at, last_activity_at)
+verified_solutions    (id, incident_id, problem_context, solution, provided_by, created_at)
 timeline_events (id, incident_id, timestamp, event_type, actor, content)
 teams           (id, name, description, contact_info)
-remediation     (id, incident_id, description, completed, source)
 post_mortems    (id, incident_id, content_json, created_at)
 ```
 
 ## Collezioni LanceDB
 
-| Collezione | Contenuto | Testo incorporato | Priorità retrieval |
-|---|---|---|---|
-| `verified_solutions` | Soluzioni fornite da umani | problem_context + solution | ALTA |
-| `past_incidents` | Incidenti chiusi + post-mortem | description + root_cause + resolution | MEDIA |
-| `knowledge_base` | Runbook/playbook | testo completo (chunked se lungo) | BASE |
+| Collezione           | Contenuto                      | Testo incorporato                     | Priorità retrieval |
+| -------------------- | ------------------------------ | ------------------------------------- | ------------------ |
+| `verified_solutions` | Soluzioni fornite da umani     | problem_context + solution            | ALTA               |
+| `past_incidents`     | Incidenti chiusi + post-mortem | description + root_cause + resolution | MEDIA              |
+| `knowledge_base`     | Runbook/playbook               | testo completo (chunked se lungo)     | BASE               |
 
 ## Tool per agente
 
 **Triage:**
+
 - `get_teams_catalog()` – sola lettura, restituisce lista team da seed
 
 **Investigator:**
+
 - `search_past_incidents(query: str, k: int = 5)` – LanceDB, sola lettura
 - `get_incident_timeline(incident_id: str)` – SQLite, sola lettura
 
 **Resolver:**
+
 - `search_verified_solutions(query: str, k: int = 3)` – LanceDB, sola lettura
 - `search_knowledge_base(query: str, k: int = 3)` – LanceDB, sola lettura
 - `search_past_incidents(query: str, k: int = 5)` – LanceDB, sola lettura
 
 **Orchestratore:**
+
 - nessun tool, solo routing (output: enum agente)
 
 Tutti gli output strutturati passano per validazione Pydantic nel livello applicativo PRIMA della scrittura nel DB.
 
 ## Modelli Groq (da config.py)
 
-| Componente | Modello | Motivazione |
-|---|---|---|
-| Orchestratore | `llama-3.1-8b-instant` | veloce, output cortissimo |
-| Triage | `gpt-oss-20b` | buon rapporto velocità/capacità per JSON strutturato |
-| Investigator | `llama-3.3-70b-versatile` | ragionamento su evidenze |
-| Resolver | `llama-3.3-70b-versatile` | output lungo e ragionato |
-| Embedding | `all-MiniLM-L6-v2` (locale) | costo zero |
+| Componente    | Modello                     | Motivazione                                          |
+| ------------- | --------------------------- | ---------------------------------------------------- |
+| Orchestratore | `llama-3.1-8b-instant`      | veloce, output cortissimo                            |
+| Triage        | `gpt-oss-20b`               | buon rapporto velocità/capacità per JSON strutturato |
+| Investigator  | `llama-3.3-70b-versatile`   | ragionamento su evidenze                             |
+| Resolver      | `llama-3.3-70b-versatile`   | output lungo e ragionato                             |
+| Embedding     | `all-MiniLM-L6-v2` (locale) | costo zero                                           |
 
 Verifica disponibilità su console.groq.com prima di iniziare. I nomi stanno in `config.py`, MAI hardcoded altrove.
 
-## Mappa cluster per il seed
+## Ground truth del retrieval
 
 Dataset seed compatto: **11 incidenti** che coprono tutti i casi (3 stati + severità
 SEV1-SEV4 + categorie varie). Solo gli incidenti **risolti** finiscono nel RAG; di
-questi, 2 cluster di 3 incidenti simili fanno da ground truth del retrieval
-(`cluster_map.json`). Gli incidenti `active`/`open` mostrano gli altri stati in dashboard.
+questi, i gruppi di incidenti simili fanno da ground truth del retrieval. I relativi
+ID attesi sono dichiarati direttamente in `eval/cases.json`, evitando una seconda
+mappa duplicata. Gli incidenti `active`/`open` mostrano gli altri stati in dashboard.
 
-| Cluster (risolti) | Categoria | Incidenti |
-|---|---|---|
-| `plc_error` | HARDWARE | INC-001, INC-002, INC-003 |
-| `db_connection_pool` | DATABASE | INC-004, INC-005, INC-006 |
+| Cluster (risolti)    | Categoria | Incidenti                 |
+| -------------------- | --------- | ------------------------- |
+| `plc_error`          | HARDWARE  | INC-001, INC-002, INC-003 |
+| `db_connection_pool` | DATABASE  | INC-004, INC-005, INC-006 |
 
 Risolti standalone: INC-007 (infrastructure), INC-008 (network).
 Attivi: INC-009 (helpdesk SEV4), INC-010 (network SEV3). Da classificare: INC-011.
-
-## Checklist di sviluppo
-
-- [x] Scheletro repo + `uv sync`
-- [x] Seed: scrivere `incidents.json` con cluster + `cluster_map.json`
-- [x] Seed: `teams.json`, `verified_solutions.json`, runbook markdown
-- [x] Seed: `run_seed.py` (popola SQLite + LanceDB)
-- [x] Embedding: caricamento modello locale, funzione `embed(text)`
-- [x] RAG retriever: `search(collection, query, k, threshold)` con soglia
-- [x] Agente triage: system prompt + output TriageOutput + validazione
-- [x] Agente investigator: system prompt + grounded + provenance
-- [x] Agente resolver: system prompt + ibrido + escalation HITL + cattura VerifiedSolution
-- [x] Orchestratore: routing LLM su modello piccolo
-- [x] API: CRUD incidenti + endpoint metriche
-- [x] API: chat con SSE streaming
-- [x] API: auth (register/login, hashing bcrypt)
-- [x] Service layer: macchina a stati + lifecycle + learning loop (`api/service.py`)
-- [x] Eval: dataset di test (triage, routing, retrieval, injection)
-- [x] Eval: `run_eval.py` con metriche per agente
-- [x] Frontend: dashboard + dettaglio incidente + chat (React + shadcn/ui)
-- [ ] Demo: happy path end-to-end + dimostrazione loop apprendimento
-- [ ] Relazione finale
 
 ## Comandi chiave
 

@@ -20,7 +20,7 @@ Il risultato è un costo ricorrente e silenzioso: incidenti gestiti due volte da
 
 Un sistema di ticketing tradizionale risolve la parte facile: registra, assegna, traccia lo stato. Non fa il lavoro cognitivo che gli esseri umani fanno male quando sono di fretta. Debrief sposta il valore proprio lì:
 
-- **Classificazione e priorità** ricavate dal linguaggio naturale della segnalazione, non da una dropdown compilata male.
+- **Classificazione della severità** ricavata dal linguaggio naturale della segnalazione, non da una dropdown compilata male.
 - **Recall semantico** degli incidenti passati: non una ricerca per parole chiave ("502") ma per *significato* ("il gateway restituisce errori intermittenti sotto carico"), che ritrova casi descritti con parole diverse ma di fatto analoghi.
 - **Sintesi di remediation**: aggregare ciò che ha funzionato in casi simili in passi concreti, invece di lasciarlo nella memoria di chi c'era.
 - **Post-mortem automatico**: trasformare la timeline e la conversazione dell'incidente in un documento strutturato, riducendo a zero l'attrito che oggi fa sì che non venga scritto.
@@ -35,9 +35,9 @@ Scenario tipico (il "happy path" che la demo deve mostrare):
 
 1. Un membro del team dichiara manualmente un incidente con una descrizione in linguaggio naturale.
 2. Si apre una **chat dedicata all'incidente** in cui operano gli agenti di Debrief.
-3. L'agente di triage classifica, assegna una priorità, suggerisce chi coinvolgere e pubblica un riassunto iniziale; se l'informazione è insufficiente, *chiede dettagli* (human-in-the-loop).
+3. L'agente di triage assegna la severità, suggerisce chi coinvolgere e pubblica un riassunto iniziale; se l'informazione è insufficiente, *chiede dettagli* (human-in-the-loop).
 4. Durante l'indagine, i membri del team interrogano il sistema con menzioni tipo `@debrief what's happening?` o `@debrief any similar incidents?` e ricevono risposte fondate su incidenti passati e knowledge base.
-5. Alla risoluzione, l'agente resolver propone i passi di remediation, traccia il progresso e, alla chiusura, **genera il post-mortem** e archivia tutto.
+5. Alla risoluzione, l'agente resolver propone i passi di remediation e, alla chiusura, il sistema **genera il post-mortem** e archivia tutto.
 
 ### 1.4 Ambito del progetto: cosa è e cosa non è
 
@@ -67,7 +67,7 @@ stateDiagram-v2
     Triage --> Attivo: classificato + prioritizzato + team suggeriti
     Attivo --> Attivo: indagine (@debrief what's happening / similar?)
     Attivo --> InRisoluzione: identificata la root cause probabile
-    InRisoluzione --> InRisoluzione: passi di remediation + tracking
+    InRisoluzione --> InRisoluzione: proposta dei passi di remediation
     InRisoluzione --> Risolto: l'utente conferma la chiusura
     Risolto --> Archiviato: post-mortem generato e salvato nel DB
     Archiviato --> [*]
@@ -92,7 +92,7 @@ flowchart TB
             A2["Investigator Agent"]
             A3["Resolver Agent"]
         end
-        METRICS["Servizio metriche\n(MTTR, uptime, conteggi)"]
+        METRICS["Servizio metriche\n(MTTR e conteggi)"]
     end
 
     subgraph DATA["Persistenza"]
@@ -121,11 +121,11 @@ flowchart TB
 
 Gli agenti non sono tre prompt sullo stesso modello: si distinguono per **tool**, **momento d'uso** e **strategia di prompt**. È questa differenziazione che giustifica un design multi-agente invece di un singolo agente con tre modalità.
 
-**Triage Agent.** Attivo nella fase iniziale. Riceve la descrizione in linguaggio naturale e produce: classificazione (categoria, severità, priorità), suggerimento dei team/responsabili da coinvolgere, e un riassunto pubblicato in chat. Se l'informazione è insufficiente, formula domande mirate all'utente — questo è il punto di **human-in-the-loop** del sistema. Tool: lettura/scrittura dello stato dell'incidente su SQLite. *Non* accede al vector DB (non gli serve), e questo è un argomento a favore della separazione.
+**Triage Agent.** Attivo nella fase iniziale. Riceve la descrizione in linguaggio naturale e produce titolo, severità, suggerimento dei team e un riassunto pubblicato in chat. Se l'informazione è insufficiente, formula domande mirate all'utente — questo è il punto di **human-in-the-loop** del sistema. Non accede al vector DB, perché la classificazione non richiede retrieval.
 
 **Investigator Agent.** Attivo nella fase di indagine. Risponde a richieste come `@debrief what's happening?` o `@debrief any similar incidents?`. Interroga LanceDB per recuperare incidenti passati semanticamente simili, identifica pattern ricorrenti e possibili root cause. Tool: ricerca semantica su LanceDB + lettura della timeline su SQLite.
 
-**Resolver Agent.** Attivo nella fase di risoluzione. Propone passi di remediation fondati su knowledge base e su ciò che ha funzionato in incidenti analoghi, traccia il progresso verso la chiusura e, alla chiusura, **genera il post-mortem** e lo archivia. Tool: ricerca su LanceDB (KB + incidenti) + scrittura del post-mortem e dello stato finale su entrambi i database.
+**Resolver Agent.** Attivo nella fase di risoluzione. Propone in chat passi fondati su knowledge base, soluzioni umane e incidenti analoghi. La chiusura esplicita dell'utente salva timeline e post-mortem e alimenta il learning loop.
 
 **Orchestratore (coordinatore).** Non è un quarto "personaggio" visibile all'utente, ma il livello che decide *quale agente deve rispondere* a un dato messaggio. È implementato con il pattern *Team* di Agno con un coordinatore basato su LLM (vedi §2.4 per il perché e i trade-off).
 
@@ -144,7 +144,7 @@ Questa combinazione mantiene il vantaggio della flessibilità senza far esploder
 
 Una distinzione progettuale importante: il sistema usa **due database con ruoli diversi**, e tenerli separati è una scelta consapevole.
 
-**SQLite — stato strutturato.** Conserva lo stato dell'applicazione: gli incidenti (id, titolo, descrizione, categoria, severità, priorità, stato, timestamp), la loro timeline di eventi, i team coinvolti, i post-mortem, gli **utenti** (con password salvata tramite hashing). Sullo stesso SQLite si appoggia anche la **persistenza di sessioni e memoria di Agno** (tabelle gestite dal framework), che abilita le conversazioni riprendibili (vedi §2.8). È ciò che alimenta la dashboard, le liste (in triage / attivi / risolti) e il calcolo delle metriche. SQLite è scelto per semplicità e **riproducibilità** (file unico, zero configurazione, l'intero stato è versionabile e ricreabile da seed) — requisito esplicito della rubrica.
+**SQLite — stato strutturato.** Conserva incidenti, timeline, post-mortem, utenti, sessioni di autenticazione, partecipanti alle conversazioni e copie persistenti delle soluzioni umane verificate. La tabella `incident_participants` collega utenti e incidenti e registra l'ultima attività. È ciò che alimenta dashboard, conversazioni riprendibili e metriche. SQLite è scelto per semplicità e **riproducibilità** (file unico, zero configurazione, stato ricreabile da seed) — requisito esplicito della rubrica.
 
 **LanceDB — recupero semantico.** Conserva le rappresentazioni vettoriali su cui si fa la ricerca per significato, in **tre collezioni distinte**: incidenti passati, knowledge base e **soluzioni verificate da umano** (vedi §3.3 e Modulo 4). È usato da investigator e resolver per il recall. È lo strumento visto a lezione, il che ne facilita la motivazione.
 
@@ -168,7 +168,7 @@ I nomi precisi dei modelli sono indicativi e verranno fissati nel Modulo 5 (scel
 
 **Backend.** Python con FastAPI, gestione dipendenze con uv — entrambi visti a lezione, scelta facile da motivare e che massimizza la riproducibilità. Il backend espone un'API REST per le operazioni CRUD sugli incidenti e per le metriche, più un **endpoint di streaming (Server-Sent Events)** per la chat.
 
-**Frontend.** Interfaccia separata in React + shadcn/ui, con scope deliberatamente blindato a tre schermate: dashboard (statistiche base — MTTR, uptime — e liste in triage/attivi/risolti), vista di dettaglio dell'incidente con la chat multi-agente, e lista incidenti. Nessuna funzionalità oltre queste finché la pipeline AI non è completa e testabile via API.
+**Frontend.** Interfaccia separata in React + shadcn/ui: login, dashboard con MTTR, conteggi e liste per stato, e vista di dettaglio con chat multi-agente. Nessuna funzionalità oltre queste finché la pipeline AI non è completa e testabile via API.
 
 **Principio di sviluppo.** Backend e agenti devono funzionare ed essere dimostrabili **via API (curl/Postman) prima che il frontend esista**. Questo garantisce un sistema dimostrabile anche se il tempo sul frontend stringe, e separa nettamente la logica intelligente dalla presentazione.
 
@@ -180,7 +180,7 @@ La chat dell'incidente è uno spazio collaborativo a cui partecipano gli utenti 
 
 **Autenticazione semplice.** Ogni utente accede con username e password; la password è salvata tramite **hashing** (mai in chiaro), e nessun segreto è hardcoded. Restano deliberatamente fuori ambito OAuth, ruoli/permessi e verifica via email: la richiesta è "gestione di più utenti", non sicurezza enterprise. Questa scelta minimale ma corretta tocca comunque il criterio di sicurezza e robustezza della rubrica (gestione corretta delle credenziali) senza introdurre complessità sproporzionata.
 
-**Un incidente è una sessione.** La persistenza nativa di Agno associa a ogni incidente una sessione identificata (`session_id`) legata all'utente (`user_id`), e la salva nel database dopo ogni interazione. Le conseguenze sono esattamente le funzioni richieste: ogni utente vede la lista delle proprie conversazioni (gli incidenti a cui ha partecipato) e può **riaprirne una qualsiasi e proseguirla**, con gli agenti che ne recuperano l'intero contesto perché la sessione è persistita. "Riprendere una vecchia conversazione" non è codice da scrivere da zero: è il caricamento di una sessione passata, capacità nativa del framework.
+**Un incidente è una sessione condivisa.** La persistenza è applicativa ed esplicita: `incident_participants` registra gli utenti che hanno creato, aperto o utilizzato la chat, mentre `timeline_events` conserva messaggi ed eventi con il relativo autore. La dashboard elenca le conversazioni dell'utente autenticato; aprendo un incidente esistente l'utente entra tra i partecipanti. Quando la conversazione riprende, il service ricostruisce dagli ultimi eventi un contesto limitato e lo passa agli agenti. Il limite evita una crescita indefinita dei token senza perdere i dettagli recenti necessari alla continuità.
 
 **Attribuzione nella chat condivisa.** Poiché più utenti possono partecipare allo stesso incidente, ogni messaggio porta l'identità di chi l'ha scritto; gli agenti restano identificabili come tali. L'identità reale (dal login) sostituisce qualsiasi selettore cosmetico.
 
@@ -201,13 +201,13 @@ Quattro principi si applicano a ogni agente e vengono ripetuti qui una volta sol
 
 **Role lock.** Ogni agente ha un ruolo stretto e rifiuta gentilmente le richieste fuori ambito (es. "scrivimi una poesia", o domande non pertinenti all'incident management), riportando la conversazione al suo compito.
 
-**Output strutturato e validato.** Dove l'output alimenta il database o la UI, l'agente produce JSON conforme a uno schema Pydantic. La persistenza **non** è affidata direttamente all'agente: l'agente *propone* un output strutturato, un sottile livello applicativo lo **valida** contro lo schema e solo allora lo scrive nel database. Questo realizza la "validazione I/O" e impedisce che un output malformato (o malevolo) raggiunga lo storage. Se la validazione fallisce, si tenta un *repair* (re-prompt con l'errore) per un numero limitato di volte, poi si degrada con grazia.
+**Output strutturato e validato.** Dove l'output alimenta il database o la UI, l'agente produce JSON conforme a uno schema Pydantic. La persistenza **non** è affidata direttamente all'agente: l'agente *propone* un output strutturato, un sottile livello applicativo lo **valida** contro lo schema e solo allora lo scrive nel database. Un output malformato non raggiunge lo storage: il turno restituisce un errore controllato e può essere ripetuto dall'utente.
 
 **Provenance.** Ogni affermazione fattuale prodotta da investigator e resolver è etichettata con la sua origine, in ordine di affidabilità decrescente: una **soluzione verificata da umano** (vedi §3.3), un incidente passato (con id), un documento della knowledge base, oppure ragionamento generale dichiarato come tale. Niente afferma­zioni senza fonte.
 
 ### 3.1 Triage Agent
 
-**Ruolo.** Trasformare una segnalazione in linguaggio naturale in un incidente classificato e azionabile: categoria, severità, team da coinvolgere, riassunto. Se l'informazione è insufficiente, formula domande mirate (human-in-the-loop) invece di indovinare.
+**Ruolo.** Trasformare una segnalazione in linguaggio naturale in un incidente azionabile: titolo, severità, team da coinvolgere e riassunto. Se l'informazione è insufficiente, formula domande mirate invece di indovinare.
 
 **Confini.** Non interroga il vector database (non gli serve, ed è uno dei motivi per cui è un agente distinto). Non risolve né investiga: si ferma alla classificazione e all'inquadramento iniziale.
 
@@ -236,7 +236,7 @@ class TriageOutput(BaseModel):
 | SEV3 | Moderato — funzionalità minore compromessa, esiste un workaround | Feature secondaria non disponibile |
 | SEV4 | Basso — impatto minimo o cosmetico | Errore di logging, problema estetico |
 
-La *priorità* (urgenza d'intervento) deriva di default dalla severità ma può divergere se il contesto lo richiede; per il prototipo le si tiene allineate salvo indicazione esplicita, per non introdurre complessità non necessaria.
+Nel prototipo l'urgenza operativa coincide con la severità, evitando un secondo campo di priorità ridondante.
 
 **Tool e validazione I/O.** Un solo tool, in **sola lettura**: `get_teams_catalog()` che restituisce la lista dei team/responsabili di seed, usata per ancorare `suggested_teams`. La scrittura dell'incidente nel database è eseguita dal livello applicativo *dopo* la validazione dello schema, non dall'agente.
 
@@ -262,13 +262,13 @@ La *priorità* (urgenza d'intervento) deriva di default dalla severità ma può 
 
 ### 3.3 Resolver Agent
 
-**Ruolo.** Proporre passi di remediation, tracciare il progresso verso la chiusura e, alla chiusura, generare il post-mortem e archiviarlo.
+**Ruolo.** Proporre passi di remediation grounded e supportare l'utente fino alla chiusura, quando il service genera e archivia il post-mortem.
 
 **Confini.** Non riclassifica l'incidente (compito del triage). Agisce nella fase di risoluzione.
 
 **Politica di grounding — ibrida ed etichettata.** Prima attinge a soluzioni verificate da umano, knowledge base e risoluzioni di incidenti passati (citati con provenance). Quando l'incidente non ha precedenti utili, è autorizzato a proporre remediation basate su conoscenza generale, **ma marcandole esplicitamente** come best practice generali e non come soluzioni tratte da casi reali. L'utente vede sempre la differenza tra "ha funzionato nell'incidente #42" e "pratica generale consigliata".
 
-**Escalation a un umano e cattura della conoscenza (human-in-the-loop di apprendimento).** Quando il retrieval non offre nulla sopra soglia e il resolver non è in grado di proporre una remediation fondata, **non inventa**: entra in uno stato di escalation e chiede esplicitamente aiuto a un umano nella chat (realizzato con il flusso *User Input* nativo di Agno). L'ingegnere risponde con la soluzione effettiva. A quel punto il sistema **cattura** quella risposta in forma strutturata e la rende conoscenza riutilizzabile:
+**Escalation a un umano e cattura della conoscenza (human-in-the-loop di apprendimento).** Quando nessun tool del resolver restituisce una fonte sopra soglia, il service rileva programmaticamente l'assenza di evidenze e invia l'evento SSE strutturato `human_help_required`. La chat mostra quindi un modulo per il contributo dell'esperto. La risposta viene persistita con incidente, autore e contesto, quindi indicizzata come conoscenza riutilizzabile:
 
 ```python
 class VerifiedSolution(BaseModel):
@@ -282,8 +282,6 @@ class VerifiedSolution(BaseModel):
 La soluzione verificata viene salvata su SQLite e **incorporata e indicizzata in LanceDB come terza fonte distinta** (`verified_solutions`), con priorità più alta nel recupero perché è la conoscenza più affidabile. Conseguenza: il prossimo incidente simile, il resolver *riesce a proporre da solo* una soluzione fondata, citando la conoscenza che prima gli mancava. È il completamento del loop di apprendimento — il sistema impara proprio nei momenti in cui fallisce.
 
 **Avvertenza onesta.** Una singola soluzione umana potrebbe non generalizzare. Per questo resta sempre un *suggerimento* mostrato a un umano con la sua provenance esplicita, non una risoluzione applicata in automatico (coerente con "il sistema suggerisce, non decide"). Il rischio e la mitigazione sono dichiarati anche nel Modulo 6.
-
-**Tracciamento del progresso.** Mantiene una checklist di remediation associata all'incidente; aggiorna lo stato dei passi man mano che vengono completati. Anche questo passa per output strutturato validato e persistito dal livello applicativo.
 
 **Post-mortem (output strutturato).** Alla chiusura genera un documento conforme a schema:
 
@@ -348,7 +346,7 @@ Perché la demo sia significativa, il sistema deve partire con una memoria stori
 
 **Dimensione.** Un ordine di grandezza di circa 30–60 incidenti distribuiti su tutte le categorie, con alcuni cluster ricorrenti intenzionali, è sufficiente a rendere il retrieval interessante restando gestibile e istantaneo da indicizzare.
 
-**Struttura di ogni incidente di seed.** Coincide con lo schema `PostMortem` del §3.3 (titolo, descrizione/sintomi, categoria, severità, timeline, root cause, passi di risoluzione, action item, data), più i metadati per il filtraggio.
+**Struttura di ogni incidente di seed.** Comprende titolo, descrizione, severità, stato, risoluzione e timestamp. Gli incidenti risolti alimentano anche il post-mortem minimale e il corpus vettoriale.
 
 **Knowledge base.** Una manciata di runbook brevi in markdown (es. "gestione di un failover del database", "triage della latenza di rete"), che il resolver cita come pratica generale.
 
@@ -372,10 +370,10 @@ La metrica di similarità è il coseno (gli embedding vengono normalizzati).
 
 L'inizializzazione è uno **script unico e idempotente** — eseguibile con un solo comando (es. `uv run seed`) — che:
 
-1. carica il dataset di seed (incidenti + knowledge base, ed eventuali soluzioni verificate di esempio) da file versionati;
+1. carica il dataset di seed (incidenti + knowledge base) da file versionati; le soluzioni verificate non sono pre-caricate, ma nascono esclusivamente dai contributi umani a runtime;
 2. popola SQLite con lo stato strutturato e alcuni utenti di seed;
 3. calcola gli embedding localmente;
-4. scrive le collezioni in LanceDB (`verified_solutions`, `past_incidents`, `knowledge_base`).
+4. scrive in LanceDB `past_incidents` e `knowledge_base`; `verified_solutions` viene creata automaticamente alla prima soluzione fornita da un esperto.
 
 Questo realizza direttamente il requisito di **riproducibilità** della rubrica: chiunque cloni il progetto può ricreare l'intero stato da zero con la documentazione fornita, senza dati esterni né credenziali.
 
@@ -391,11 +389,13 @@ Flusso di una ricerca (es. investigator che risponde a "incidenti simili?"):
 
 **Priorità tra le fonti.** Quando la stessa query interroga più collezioni, le `verified_solutions` hanno precedenza sulle altre a parità di rilevanza, perché rappresentano conoscenza convalidata da un umano; seguono `past_incidents` e infine `knowledge_base`. La provenance resta sempre esplicita (§3.0), così l'utente sa da quale fonte arriva ogni suggerimento.
 
-**Filtro per metadati (opzionale ma consigliato).** LanceDB consente di combinare la ricerca vettoriale con filtri su metadati (es. stessa categoria o severità). Restringere alla stessa categoria affina notevolmente i "simili" e riduce i falsi positivi; è un miglioramento a basso costo che vale la pena includere.
+**Filtro per metadati (evoluzione futura).** La versione corrente usa similarità semantica e soglia globale. Un filtro aggiuntivo per severità potrebbe ridurre ulteriormente i falsi positivi su dataset più grandi.
 
 **Il loop chiuso a runtime (due sorgenti di apprendimento).** Alla chiusura di un incidente (§3.3), il suo post-mortem viene incorporato e aggiunto a `past_incidents`. Inoltre, ogni volta che un umano fornisce una soluzione in risposta a un'escalation del resolver, questa viene catturata e aggiunta a `verified_solutions`. In entrambi i casi è la stessa pipeline del seed applicata a runtime a un singolo record: il corpus cresce e il sistema diventa più capace a ogni risoluzione, sia che risolva da solo sia che impari da un umano.
 
 ### 4.7 Qualità della pipeline e modalità di fallimento
+
+**Consistenza tra SQLite e LanceDB.** SQLite è la sorgente di verità per lo stato dell'incidente: la chiusura, la timeline e il post-mortem vengono persistiti prima di aggiornare il corpus vettoriale. L'indicizzazione runtime è *best effort*: se embedding o LanceDB non sono disponibili, la chiusura resta valida e l'errore viene registrato per la diagnosi. In questo modo un componente derivato, usato per il retrieval, non rende incoerente l'operazione principale visibile all'utente.
 
 La rubrica chiede una "pipeline dati di qualità". Gli accorgimenti previsti: schema coerente tra seed e dati a runtime (lo stesso `PostMortem`), i pattern ricorrenti intenzionali, la calibrazione della soglia di similarità, la dichiarazione esplicita della natura sintetica dei dati di seed.
 
@@ -452,7 +452,7 @@ Quattro leve, tutte già anticipate nei moduli precedenti, qui consolidate come 
 
 1. **Router su modello minuscolo con output vincolato** (§2.4). L'orchestrazione LLM costa una chiamata in più per messaggio; tenerla su un modello piccolo con output ridotto a un enum la rende trascurabile in token.
 2. **Prompt magri.** System prompt concisi, storia chat troncata/riassunta quando cresce, risultati RAG limitati a top-k con la sola informazione utile. Ogni token non inviato è margine guadagnato sul tetto/minuto.
-3. **Lavoro deterministico fuori dall'LLM.** Ricerca vettoriale, calcolo di MTTR/uptime, archiviazione, validazione di schema: tutto codice, non inferenza. L'LLM si invoca solo dove serve davvero il linguaggio naturale.
+3. **Lavoro deterministico fuori dall'LLM.** Ricerca vettoriale, calcolo di MTTR e conteggi, archiviazione e validazione di schema sono codice normale. L'LLM si invoca solo dove serve il linguaggio naturale.
 4. **Caching.** Dove disponibile, i token in cache non contano verso i rate limit, regalando margine sulle parti ripetute dei prompt.
 
 In caso di necessità durante lo sviluppo intenso, aggiungere una carta di credito sblocca il developer tier (circa 10x i limiti e uno sconto del 25% sui token) senza spesa minima: un fallback economico, non una necessità.
@@ -474,18 +474,18 @@ Ogni agente ha una metrica di successo diversa, perché fa un mestiere diverso. 
 
 Distinto dal seed di runtime, un piccolo insieme di test etichettati:
 
-- **Triage:** un insieme di descrizioni di incidenti con la severità e la categoria "corrette" già assegnate a mano (ground truth), inclusi alcuni casi volutamente sotto-specificati per testare il trigger di richiesta chiarimenti.
+- **Triage:** descrizioni con severità attesa assegnata a mano, inclusi casi sotto-specificati per testare la richiesta di chiarimenti.
 - **Investigator (retrieval):** la ground truth è già nel seed grazie ai **cluster ricorrenti** intenzionali (§4.2): per un incidente di prova so quali incidenti passati *dovrebbero* essere recuperati come simili. Più alcuni casi senza alcun simile, per testare il comportamento "nessuno trovato" sotto soglia.
 - **Routing:** messaggi di chat etichettati con l'agente atteso.
 - **Difese (red-team):** un piccolo insieme di input ostili (tentativi di prompt injection, richieste fuori ruolo) per verificare le difese del §3.0.
 
 ### 6.3 Metriche per agente
 
-**Triage — metriche da classificatore.** Accuratezza complessiva e per-classe sulla categoria e sulla severità, con matrice di confusione (utile per capire *quali* severità confonde: confondere SEV3 e SEV4 è meno grave che confondere SEV1 e SEV4). Inoltre: correttezza del trigger `needs_clarification` sui casi sotto-specificati. Tutto deterministico, nessun giudice necessario.
+**Triage — metriche da classificatore.** Accuratezza esatta e con tolleranza di un livello sulla severità, matrice di confusione, correttezza di `needs_clarification` e violazioni del catalogo team.
 
 **Investigator — metriche da retrieval.** Precision@k e recall@k rispetto ai cluster noti, hit rate (l'incidente simile atteso compare nei top-k?), e accuratezza del comportamento di soglia (dice correttamente "nessun simile" quando non c'è nulla sopra soglia?). Deterministico.
 
-**Resolver — groundedness deterministica + giudizio sul resto.** La domanda più importante — *ha allucinato?* — si risponde in codice: ogni id di incidente o documento citato dal resolver viene verificato contro il database; un id inesistente è un'allucinazione conteggiata. Si verifica anche la correttezza della provenance (ciò che è marcato "da incidente reale" lo è davvero) e la completezza del post-mortem (tutti i campi dello schema sono compilati in modo non banale). Solo le dimensioni soggettive residue — pertinenza e coerenza della remediation, qualità redazionale del post-mortem — passano per il giudizio (§6.4).
+**Resolver — groundedness deterministica.** Gli identificativi `INC-*` e `VS-*` citati vengono confrontati con i dataset reali. Si misurano tasso di citazione, citazioni valide e recupero di almeno una fonte attesa per caso.
 
 **Orchestratore — accuratezza di routing.** Percentuale di messaggi instradati all'agente atteso, con matrice di confusione tra agenti. Deterministico.
 
@@ -493,25 +493,13 @@ Distinto dal seed di runtime, un piccolo insieme di test etichettati:
 
 **Apprendimento dalla conoscenza umana — test del loop.** Una metrica dedicata al secondo suggerimento del docente: si prende un incidente che il resolver inizialmente non sa risolvere (retrieval sotto soglia), si fornisce una soluzione umana che il sistema cattura in `verified_solutions`, e si verifica che una **query simile successiva** la recuperi e che il resolver ora proponga una soluzione fondata citandola. È una dimostrazione deterministica e ripetibile del fatto che il sistema *impara*, non solo che archivia.
 
-### 6.4 LLM-as-judge, usato con disciplina
+### 6.4 Valutazione soggettiva
 
-Per le sole dimensioni soggettive del resolver, un secondo LLM valuta gli output secondo una **rubrica** (punteggi su dimensioni specifiche — pertinenza, coerenza, completezza — non un vago "è buono?"). Le precauzioni che rendono questo approccio credibile, tutte applicate:
-
-- **Calibrazione contro giudizio umano.** Si valuta a mano un piccolo sottoinsieme e si misura l'accordo tra il giudice LLM e il valutatore umano. Solo se l'accordo è accettabile il giudice viene usato sul resto, e questo accordo viene riportato. È il passaggio che distingue una metodologia seria da "AI che vota AI".
-- **Giudice diverso dal valutato**, per ridurre il bias di auto-preferenza.
-- **Determinismo:** temperatura 0 e prompt fisso, così la valutazione è riproducibile.
-- **Limiti dichiarati:** i bias noti dell'LLM-as-judge (preferenza per risposte lunghe, indulgenza) sono riconosciuti esplicitamente nel §6.7.
-
-Il giudice resta deliberatamente la ciliegina: l'impalcatura della valutazione sono le metriche deterministiche del §6.3.
+Il prototipo non usa un LLM-as-judge: senza una calibrazione umana sarebbe una misura poco affidabile. Pertinenza e qualità redazionale del Resolver vengono discusse manualmente su pochi esempi, mentre l'harness si limita a proprietà verificabili automaticamente.
 
 ### 6.5 Metriche operative
 
-Misurate durante l'esecuzione e riportate onestamente:
-
-- **Latenza per agente** (time-to-first-token e tempo totale), perché la reattività della chat è parte dell'esperienza.
-- **Token per interazione**, per agente, per verificare la tenuta rispetto al tetto di 6.000 token/minuto (§5.4).
-- **Costo per incidente gestito end-to-end** — una cifra concreta (anche pochi centesimi), ottenuta moltiplicando i token osservati per il prezzo dei modelli. È una delle frasi più efficaci della relazione: dimostra che il costo è stato *misurato*, non intuito.
-- **Eventi di rate limit** (429) osservati e come il sistema vi reagisce.
+L'harness misura il tempo totale di ogni suite. Token, costo economico e time-to-first-token non sono strumentati automaticamente in questa versione e vengono dichiarati come evoluzione futura.
 
 ### 6.6 L'harness di valutazione
 
@@ -544,12 +532,12 @@ Riepilogo di ciò che il progetto fa e non fa, raccolto qui per chiarezza.
 
 - dichiarazione manuale di un incidente con descrizione in linguaggio naturale;
 - chat dell'incidente con tre agenti orchestrati da un router LLM;
-- triage con classificazione strutturata (categoria, severità SEV1–SEV4), suggerimento dei team e human-in-the-loop per i dettagli mancanti;
+- triage con titolo, severità SEV1–SEV4, suggerimento dei team e human-in-the-loop per i dettagli mancanti;
 - investigator con retrieval semantico grounded sugli incidenti passati;
-- resolver con remediation a grounding ibrido, tracciamento del progresso, **escalation a un umano quando non sa risolvere e cattura della soluzione come conoscenza riutilizzabile**, e post-mortem automatico con loop chiuso (re-indicizzazione in LanceDB);
+- resolver con remediation grounded, **escalation a un umano quando non trova fonti e cattura della soluzione come conoscenza riutilizzabile**, e post-mortem automatico con loop chiuso;
 - **multi-utente con autenticazione semplice (username + password con hashing)**;
-- **conversazioni riprendibili: ogni incidente è una sessione persistente che l'utente può riaprire e proseguire** (persistenza nativa di Agno);
-- dashboard con statistiche (MTTR, uptime, conteggi) e liste per stato;
+- **conversazioni riprendibili:** partecipanti e timeline persistiti in SQLite, con contesto recente ricostruito per gli agenti;
+- dashboard con MTTR, conteggi e liste per stato;
 - harness di valutazione riproducibile.
 
 **Fuori ambito (dichiarato consapevolmente):**
@@ -565,9 +553,9 @@ Riepilogo di ciò che il progetto fa e non fa, raccolto qui per chiarezza.
 L'ordine di sviluppo segue un principio guida: **il valore AI prima della presentazione**, e ogni strato testabile prima di costruire quello sopra. Il backend e gli agenti devono essere dimostrabili via API (curl/Postman) prima che il frontend esista, così esiste sempre un sistema dimostrabile anche se il tempo stringe.
 
 1. **Fondamenta:** repository, ambiente con uv, configurazione (chiavi in env, id modelli in config), scheletro del progetto.
-2. **Strato dati:** dataset di seed con i cluster ricorrenti intenzionali, schema SQLite (incidenti, timeline, utenti), indicizzazione delle tre collezioni LanceDB, script `uv run seed` idempotente. *Si annota fin da subito la mappa cluster→incidenti, che sarà la ground truth della valutazione del retrieval.*
+2. **Strato dati:** dataset di seed con gruppi ricorrenti intenzionali, schema SQLite (incidenti, timeline, utenti), indicizzazione iniziale di incidenti e knowledge base, script `uv run seed` idempotente. *Gli ID rilevanti attesi sono annotati direttamente nei casi di valutazione del retrieval, senza mantenere una mappa duplicata.*
 3. **Strato di retrieval:** embedding locali, tool di ricerca con soglia di similarità e priorità tra fonti, testabili in isolamento.
-4. **Utenti e sessioni:** autenticazione semplice (hashing password) e persistenza delle sessioni Agno su SQLite (incidente = sessione, riapribile).
+4. **Utenti e sessioni:** autenticazione semplice, partecipanti e timeline persistiti in SQLite (incidente = sessione condivisa e riapribile).
 5. **Agenti, uno alla volta:** triage (output strutturato + validazione) → investigator (grounded) → resolver (ibrido + post-mortem + escalation a umano con cattura della soluzione + loop chiuso). Ciascuno testabile via API appena pronto.
 6. **Orchestratore** e logica di routing.
 7. **Superficie API (FastAPI):** login, CRUD incidenti, lista conversazioni per utente, endpoint chat con streaming SSE, endpoint metriche.
@@ -590,7 +578,7 @@ Tabella di autovalutazione: dove il progetto risponde a ciascun criterio. Utile 
 |---|---|
 | **Architettura e qualità tecnica (8)** | Separazione netta degli strati; "l'agente propone, il backend valida e scrive" (§3.0); id modelli in config e chiavi in env, password con hashing, nessun segreto hardcoded (§2.8, §5.1); riproducibilità via `uv run seed` da zero (§4.5) |
 | **Implementazione AI (8)** | Multi-agente orchestrato (Mod. 3); prompt engineering difensivo e provenance a fonti prioritizzate (§3.0); RAG con tre corpora e pipeline dati curata (Mod. 4); scelta dei modelli per compito (§5.3); tool con validazione I/O (§3.0–3.3) |
-| **Valutazione e critica (8)** | Harness riproducibile con metriche per agente, incluso il test del loop di apprendimento (Mod. 6); metriche deterministiche + LLM-as-judge calibrato (§6.3–6.4); costi/latenza misurati (§6.5); limiti dichiarati con onestà (§6.7) |
+| **Valutazione e critica (8)** | Harness riproducibile con metriche deterministiche per triage, routing, resolver, retrieval, injection e learning loop; durata delle suite e limiti dichiarati (§6.3–6.7) |
 | **UX e funzionalità (6)** | Flusso coerente dichiarazione→post-mortem; multi-utente con conversazioni riprendibili (§2.8); Agentic UI con streaming e stati visibili degli agenti (§2.7); dashboard comprensibile; degradazione con grazia (§4.7, §6.7) |
 | **Bonus +1 complessità** | Orchestrazione multi-agente con router LLM (§2.4); doppio human-in-the-loop: dettagli nel triage (§3.1) ed escalation con apprendimento nel resolver (§3.3) |
 | **Bonus +1 originalità** | Loop chiuso di capitalizzazione della conoscenza da due sorgenti — post-mortem automatici e soluzioni umane catturate — che rende il sistema più capace a ogni incidente (§3.3, §4.6) |

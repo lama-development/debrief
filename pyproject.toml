@@ -13,13 +13,6 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv",
     "bcrypt",
-    "pyarrow",
-]
-
-[project.optional-dependencies]
-dev = [
-    "httpx",
-    "pytest",
 ]
 
 [project.scripts]
