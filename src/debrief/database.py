@@ -19,6 +19,8 @@ import re         # espressioni regolari (regex), qui per estrarre il numero dal
 import json       # per serializzare/deserializzare i post-mortem come testo JSON
 from datetime import datetime
 
+from debrief.config import SQLITE_PATH
+
 
 def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     """Restituisce una connessione al database SQLite.
@@ -26,7 +28,7 @@ def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     # `db_path: str | None = None` → parametro opzionale: se non passato vale None e
     # allora leggiamo il percorso dalle env (con un default).
     if db_path is None:
-        db_path = os.getenv("SQLITE_PATH", "data/debrief.db")
+        db_path = os.getenv("SQLITE_PATH", SQLITE_PATH)
 
     # os.path.dirname("data/debrief.db") = "data". exist_ok=True → non errore se
     # la cartella c'è già. Così un clone pulito del progetto parte senza errori.
@@ -75,10 +77,19 @@ def create_tables(conn: sqlite3.Connection):
             severity    TEXT,
             status      TEXT DEFAULT 'open',
             created_by  TEXT,
-            session_id  TEXT,
             created_at  TEXT DEFAULT (datetime('now')),
             updated_at  TEXT DEFAULT (datetime('now')),
             resolved_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS incident_participants (
+            incident_id      TEXT NOT NULL,
+            user_id          TEXT NOT NULL,
+            joined_at        TEXT DEFAULT (datetime('now')),
+            last_activity_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (incident_id, user_id),
+            FOREIGN KEY (incident_id) REFERENCES incidents(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS timeline_events (
@@ -91,20 +102,21 @@ def create_tables(conn: sqlite3.Connection):
             FOREIGN KEY (incident_id) REFERENCES incidents(id)
         );
 
-        CREATE TABLE IF NOT EXISTS remediation_steps (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            incident_id TEXT NOT NULL,
-            description TEXT NOT NULL,
-            completed   INTEGER DEFAULT 0,
-            source      TEXT,
-            FOREIGN KEY (incident_id) REFERENCES incidents(id)
-        );
-
         CREATE TABLE IF NOT EXISTS post_mortems (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             incident_id TEXT UNIQUE NOT NULL,
             content_json TEXT NOT NULL,
             created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (incident_id) REFERENCES incidents(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS verified_solutions (
+            id              TEXT PRIMARY KEY,
+            incident_id     TEXT NOT NULL,
+            problem_context TEXT NOT NULL,
+            solution        TEXT NOT NULL,
+            provided_by     TEXT NOT NULL,
+            created_at      TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (incident_id) REFERENCES incidents(id)
         );
     """)
@@ -156,17 +168,12 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
             inc["created_at"], resolved_at)
         )
 
-        # Il post-mortem si salva SOLO per gli incidenti risolti: sono gli unici
-        # con root_cause e resolution_steps. Lo serializziamo come JSON in una colonna TEXT.
         if status == "resolved":
             post_mortem = {
                 "incident_id": inc["id"],
                 "title": inc["title"],
                 "severity": inc["severity"],
-                "impact": inc.get("impact", ""),
-                "detection": inc.get("detection", ""),
-                "root_cause": inc.get("root_cause", ""),
-                "resolution_steps": inc.get("resolution_steps", []),
+                "resolution": inc.get("resolution", ""),
             }
             conn.execute(
                 "INSERT OR REPLACE INTO post_mortems (incident_id, content_json) VALUES (?, ?)",
@@ -230,6 +237,11 @@ def create_incident(description: str, created_by: str, title: str | None = None,
                VALUES (?, 'message', ?, ?)""",
             (inc_id, created_by, description),
         )
+        conn.execute(
+            """INSERT INTO incident_participants (incident_id, user_id)
+               VALUES (?, ?)""",
+            (inc_id, created_by),
+        )
         conn.commit()
         # Rileggiamo la riga appena creata per restituirla completa (con i default).
         row = conn.execute("SELECT * FROM incidents WHERE id = ?", (inc_id,)).fetchone()
@@ -252,24 +264,96 @@ def get_incident(incident_id: str, db_path: str | None = None) -> dict | None:
         conn.close()
 
 
-def list_incidents(status: str | None = None, limit: int = 100, db_path: str | None = None) -> list[dict]:
-    """Elenca gli incidenti, opzionalmente filtrati per status. Più recenti prima."""
+def list_user_incidents(user_id: str, status: str | None = None, limit: int = 100,
+                        db_path: str | None = None) -> list[dict]:
+    """Elenca le conversazioni a cui l'utente ha partecipato, più i seed pubblici."""
     conn = get_connection(db_path)
     try:
+        filters = ["(p.user_id = ? OR i.created_by = ? OR i.created_by IS NULL)"]
+        params: list[object] = [user_id, user_id]
         if status:
-            # ORDER BY ... DESC = ordina dal più recente. LIMIT = max risultati.
-            rows = conn.execute(
-                "SELECT * FROM incidents WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?",
-                (status, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM incidents ORDER BY created_at DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-        # List comprehension: crea una lista convertendo ogni Row in dict.
-        # Equivale a un for che fa append, ma più compatto: [f(x) for x in lista].
-        return [dict(r) for r in rows]
+            filters.append("i.status = ?")
+            params.append(status)
+        params.append(limit)
+        rows = conn.execute(
+            f"""SELECT DISTINCT i.*
+                FROM incidents AS i
+                LEFT JOIN incident_participants AS p ON p.incident_id = i.id
+                WHERE {' AND '.join(filters)}
+                ORDER BY i.updated_at DESC, i.id DESC
+                LIMIT ?""",
+            params,
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def add_incident_participant(incident_id: str, user_id: str,
+                             db_path: str | None = None) -> None:
+    """Registra la partecipazione o aggiorna l'ultima attività dell'utente."""
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO incident_participants (incident_id, user_id)
+               VALUES (?, ?)
+               ON CONFLICT(incident_id, user_id) DO UPDATE SET
+                   last_activity_at = datetime('now')""",
+            (incident_id, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_incident_participants(incident_id: str, db_path: str | None = None) -> list[dict]:
+    """Restituisce identità e attività dei partecipanti alla conversazione."""
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute(
+            """SELECT u.id, u.username, p.joined_at, p.last_activity_at
+               FROM incident_participants AS p
+               JOIN users AS u ON u.id = p.user_id
+               WHERE p.incident_id = ?
+               ORDER BY p.joined_at ASC, u.username ASC""",
+            (incident_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def get_incident_teams(incident_id: str, db_path: str | None = None) -> list[str]:
+    """Restituisce il set corrente di team coinvolti, calcolato come
+    involvement - disinvolvement sull'intera timeline (append-only)."""
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute(
+            """SELECT event_type, content FROM timeline_events
+               WHERE incident_id = ? AND event_type IN ('involvement', 'disinvolvement')
+               ORDER BY id ASC""",
+            (incident_id,),
+        ).fetchall()
+        teams: set[str] = set()
+        for r in rows:
+            if r["event_type"] == "involvement":
+                teams.add(r["content"])
+            else:
+                teams.discard(r["content"])
+        return sorted(teams)
+    finally:
+        conn.close()
+
+
+def update_incident_severity(incident_id: str, severity: str, db_path: str | None = None):
+    """Aggiorna solo la severità (override umano; non tocca il titolo)."""
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "UPDATE incidents SET severity = ?, updated_at = datetime('now') WHERE id = ?",
+            (severity, incident_id),
+        )
+        conn.commit()
     finally:
         conn.close()
 
@@ -346,36 +430,6 @@ def get_timeline(incident_id: str, db_path: str | None = None) -> list[dict]:
         conn.close()
 
 
-def add_remediation_steps(incident_id: str, steps: list[dict], db_path: str | None = None):
-    """Inserisce passi di remediation. Ogni step: {description, completed?, source?}."""
-    conn = get_connection(db_path)
-    try:
-        for step in steps:
-            conn.execute(
-                """INSERT INTO remediation_steps (incident_id, description, completed, source)
-                   VALUES (?, ?, ?, ?)""",
-                # int(bool) → SQLite non ha un vero booleano: True diventa 1, False 0.
-                (incident_id, step["description"],
-                int(step.get("completed", False)), step.get("source", "general")),
-            )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def get_remediation(incident_id: str, db_path: str | None = None) -> list[dict]:
-    """Restituisce i passi di remediation di un incidente."""
-    conn = get_connection(db_path)
-    try:
-        rows = conn.execute(
-            "SELECT * FROM remediation_steps WHERE incident_id = ? ORDER BY id ASC",
-            (incident_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
 def save_post_mortem(incident_id: str, content_json: str, db_path: str | None = None):
     """Salva (o sostituisce) il post-mortem di un incidente come JSON."""
     conn = get_connection(db_path)
@@ -399,6 +453,51 @@ def get_post_mortem(incident_id: str, db_path: str | None = None) -> dict | None
         ).fetchone()
         # json.loads = da testo JSON a dict Python. Lo facciamo solo se row esiste.
         return json.loads(row["content_json"]) if row else None
+    finally:
+        conn.close()
+
+
+def save_verified_solution(solution: dict, db_path: str | None = None) -> dict:
+    """Persiste una soluzione umana prima della sua indicizzazione vettoriale."""
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO verified_solutions
+               (id, incident_id, problem_context, solution, provided_by)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                solution["id"],
+                solution["incident_id"],
+                solution["problem_context"],
+                solution["solution"],
+                solution["provided_by"],
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM verified_solutions WHERE id = ?", (solution["id"],)
+        ).fetchone()
+        assert row is not None
+        return dict(row)
+    finally:
+        conn.close()
+
+
+def list_verified_solutions(incident_id: str | None = None,
+                            db_path: str | None = None) -> list[dict]:
+    """Elenca la conoscenza umana catturata, opzionalmente per incidente."""
+    conn = get_connection(db_path)
+    try:
+        if incident_id:
+            rows = conn.execute(
+                "SELECT * FROM verified_solutions WHERE incident_id = ? ORDER BY created_at",
+                (incident_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM verified_solutions ORDER BY created_at"
+            ).fetchall()
+        return [dict(row) for row in rows]
     finally:
         conn.close()
 
@@ -538,5 +637,5 @@ def mttr_seconds(db_path: str | None = None) -> float | None:
 if __name__ == "__main__":
     conn = get_connection()
     create_tables(conn)
-    print("🟢 SQLite tables created")
+    print("SQLite tables created")
     conn.close()

@@ -29,21 +29,12 @@ class Severity(str, Enum):
     SEV4 = "SEV4"
 
 
-class IncidentStatus(str, Enum):
-    # Ciclo di vita semplificato a 3 stati:
-    #   open    -> appena dichiarato / in triage / in attesa di dettagli
-    #   active  -> classificato e in lavorazione (inclusa la proposta di risoluzione)
-    #   resolved-> chiuso (stato terminale, riapribile)
-    OPEN = "open"
-    ACTIVE = "active"
-    RESOLVED = "resolved"
-
-
 class AgentRole(str, Enum):
     """Output dell'orchestratore: quale agente attivare."""
     TRIAGE = "triage"
     INVESTIGATOR = "investigator"
     RESOLVER = "resolver"
+    OVERRIDE = "override"
     NONE = "none"
 
 
@@ -56,7 +47,6 @@ class TriageOutput(BaseModel):
     # `list[str]` = lista di stringhe. "= []" la rende opzionale, con lista vuota
     # come default. (Nota: in Pydantic v2 i default mutabili come [] sono gestiti
     # in modo sicuro, ogni istanza ottiene la propria lista.)
-    affected_systems: list[str] = []
     suggested_teams: list[str] = []
     summary: str
     needs_clarification: bool = False          # serve chiedere chiarimenti all'utente?
@@ -80,18 +70,14 @@ class PostMortem(BaseModel):
     incident_id: str
     title: str
     severity: Severity
-    timeline: list[TimelineEvent]      # lista di oggetti TimelineEvent (modelli annidati)
-    impact: str
-    detection: str
-    root_cause: str
-    resolution_steps: list[str]
-    action_items: list[str]
-    references: list[str] = []
+    timeline: list[TimelineEvent]
+    resolution: str = ""
 
 
 class VerifiedSolution(BaseModel):
     """Soluzione fornita da un umano e catturata dal resolver.
     Indicizzata in LanceDB come fonte ad alta priorità."""
+    id: str
     incident_id: str
     problem_context: str
     solution: str
@@ -99,15 +85,24 @@ class VerifiedSolution(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
 
 
-class RemediationStep(BaseModel):
-    description: str
-    completed: bool = False
-    # `source` traccia la PROVENIENZA del passo (da dove arriva il suggerimento):
-    # serve a non spacciare conoscenza generica per soluzione verificata.
-    source: str  # "verified_solution:#id" | "past_incident:#id" | "knowledge_base" | "general"
+class ClassificationOverrideRequest(BaseModel):
+    """Richiesta di override umano su severità e/o team coinvolti."""
+    severity: Severity | None = None
+    add_teams: list[str] = []
+    remove_teams: list[str] = []
+    reason: str | None = None
+
+
+class OverrideParams(BaseModel):
+    """Parametri estratti dall'orchestratore quando riconosce un intent di override."""
+    severity: Severity | None = None
+    add_teams: list[str] = []
+    remove_teams: list[str] = []
+    description: str = ""
 
 
 class RoutingDecision(BaseModel):
     """Output dell'orchestratore."""
     agent: AgentRole           # quale agente deve rispondere
     reason: str = ""           # motivazione (una frase), utile per debug/log
+    override_params: OverrideParams | None = None  # valorizzato solo se agent == "override"

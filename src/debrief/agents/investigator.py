@@ -36,7 +36,7 @@ def create_investigator_agent() -> Agent:
     """Crea e restituisce l'investigator agent configurato."""
     return Agent(
         name="Investigator Agent",
-        model=Groq(id=MODELS["investigator"]),
+        model=Groq(id=MODELS["investigator"], temperature=TEMPERATURE["investigator"]),
         description="Cerca incidenti simili nel database e identifica pattern ricorrenti.",
         instructions=INVESTIGATOR_INSTRUCTIONS,
         # tools = lista di funzioni che l'agente può invocare autonomamente. Qui
@@ -50,21 +50,15 @@ def create_investigator_agent() -> Agent:
     )
 
 
-def build_investigation_prompt(question: str, incident_context: str = "") -> str:
-    """Costruisce il prompt di indagine. Estratto come funzione pura così che
-    sia il percorso bloccante (investigate) sia lo streaming (service layer)
-    usino esattamente lo stesso prompt."""
-    # Se abbiamo il contesto dell'incidente, lo includiamo (delimitato) prima della
-    # domanda. Altrimenti passiamo solo la domanda. Stesso prompt sia per la via
-    # bloccante (investigate) sia per lo streaming → comportamento identico.
+def build_investigation_prompt(question: str, incident_context: str = "", triage_context: str = "") -> str:
+    """Costruisce il prompt di indagine."""
+    parts = []
+    if triage_context:
+        parts.append(f"<triage_results>\n{triage_context}\n</triage_results>")
     if incident_context:
-        return f"""Current incident context:
-<incident_description>
-{incident_context}
-</incident_description>
-
-User question: {question}"""
-    return question
+        parts.append(f"<incident_description>\n{incident_context}\n</incident_description>")
+    parts.append(f"Task: {question}")
+    return "\n\n".join(parts)
 
 
 def investigate(agent: Agent, question: str, incident_context: str = "") -> str:

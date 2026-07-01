@@ -18,12 +18,6 @@ from dotenv import load_dotenv
 # variabili scritte nel file .env (es. GROQ_API_KEY=...).
 load_dotenv()
 
-# API Keys
-# os.getenv("NOME", default) legge la variabile d'ambiente "NOME".
-# Se non esiste, invece di andare in errore restituisce il secondo argomento
-# (qui "", stringa vuota): un default sicuro.
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-
 # Modelli Groq
 # Un dizionario (dict): struttura chiave -> valore. Associa a ogni agente il
 # nome del modello LLM che deve usare. Il router (orchestrator) usa un modello
@@ -61,4 +55,3 @@ TEMPERATURE = {
     "investigator": 0.2,          # minima variabilità
     "resolver": 0.3,              # creatività controllata nel proporre soluzioni
 }
-MAX_REPAIR_RETRIES = 2            # tentativi di "riparazione" su JSON malformato
