@@ -6,10 +6,13 @@ Uso:
 
 Cosa fa:
 1. Crea le tabelle SQLite
-2. Carica team, incidenti e soluzioni verificate in SQLite
+2. Carica team e incidenti in SQLite
 3. Calcola gli embedding localmente
-4. Indicizza tutto in LanceDB (3 collezioni)
+4. Indicizza incidenti passati e knowledge base in LanceDB
 5. Esegue un test di ricerca semantica per verificare che funzioni
+
+Le soluzioni verificate non sono dati di seed: la relativa collezione nasce
+quando un esperto fornisce il primo contributo a runtime.
 
 È uno SCRIPT, non un modulo importato dall'app: si lancia una volta sola per
 preparare il database iniziale (i dati passati su cui il RAG farà le ricerche).
@@ -19,6 +22,10 @@ import os
 import sys      # serve per manipolare il "path" di import (vedi sotto)
 import json
 import glob     # cerca file con un pattern (es. tutti i *.md in una cartella)
+
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
 
 # Aggiungi la cartella src/ al path di Python così possiamo importare `debrief`.
 # __file__ = percorso di questo script; dirname(__file__) = la sua cartella (seed/);
@@ -30,7 +37,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 # identico, così i dati di seed e quelli creati a runtime hanno la stessa forma.
 from debrief.database import get_connection, create_tables, load_teams, load_incidents
 from debrief.tools.embedding import embed_text, embed_texts
-from debrief.rag.indexer import get_db, index_incidents, index_knowledge_base, index_verified_solutions, search, _build_incident_text
+from debrief.rag.indexer import (
+    get_db,
+    index_incidents,
+    index_knowledge_base,
+    index_verified_solutions,
+    search,
+    _build_incident_text,
+)
 
 
 def main():
@@ -40,14 +54,15 @@ def main():
     # il separatore giusto del sistema operativo (\ su Windows, / su Linux/Mac).
     seed_dir = os.path.join(os.path.dirname(__file__))
     incidents_path = os.path.join(seed_dir, "incidents.json")
-    teams_path = os.path.join(seed_dir, "teams.json")
     solutions_path = os.path.join(seed_dir, "verified_solutions.json")
+    teams_path = os.path.join(seed_dir, "teams.json")
     kb_dir = os.path.join(seed_dir, "knowledge_base")
 
     # --- 1. SQLite ---
     print("🔵 Setting up SQLite...")
     conn = get_connection()
     create_tables(conn)              # idempotente: sicuro anche se le tabelle esistono già
+    conn.execute("DELETE FROM verified_solutions")
     print("🟢 Tables created")
 
     # Ogni loader restituisce QUANTI record ha caricato: lo stampiamo come riscontro.
@@ -56,6 +71,23 @@ def main():
 
     n_incidents = load_incidents(conn, incidents_path)
     print(f"🟢 {n_incidents} incidents loaded")
+
+    with open(solutions_path, encoding="utf-8") as f:
+        solutions = json.load(f)
+    conn.executemany(
+        """INSERT INTO verified_solutions
+           (id, incident_id, problem_context, solution, provided_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                item["id"], item["incident_id"], item["problem_context"],
+                item["solution"], item["provided_by"], item["created_at"],
+            )
+            for item in solutions
+        ],
+    )
+    conn.commit()
+    print(f"🟢 {len(solutions)} verified solutions loaded")
 
     conn.close()
     print()
@@ -71,9 +103,6 @@ def main():
     # con root_cause e resolution_steps, cioè con qualcosa di utile da recuperare.
     # Gli incidenti open/active sono "in corso" e non hanno una risoluzione da indicizzare.
     rag_incidents = [inc for inc in incidents if inc.get("status", "resolved") == "resolved"]
-
-    with open(solutions_path, encoding="utf-8") as f:
-        solutions = json.load(f)
 
     # Carica i runbook della knowledge base (file Markdown).
     kb_docs = []
@@ -91,7 +120,10 @@ def main():
             "text": text,
         })
 
-    print(f"🟢 {len(incidents)} incidents ({len(rag_incidents)} risolti → RAG), {len(solutions)} solutions, {len(kb_docs)} runbooks ready")
+    print(
+        f"🟢 {len(incidents)} incidents ({len(rag_incidents)} risolti → RAG), "
+        f"{len(solutions)} solutions, {len(kb_docs)} runbooks ready"
+    )
 
     # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
     # Il testo indicizzato in LanceDB sarà leggibile e autocontenuto,
@@ -120,7 +152,7 @@ def main():
     # Per ogni tipo costruiamo la lista dei testi DA incorporare. Devono coincidere
     # con il testo usato in fase di ricerca (vedi indexer._build_incident_text).
     incident_texts = [_build_incident_text(inc) for inc in rag_incidents]
-    solution_texts = [s["problem_context"] + " " + s["solution"] for s in solutions]
+    solution_texts = [item["problem_context"] + " " + item["solution"] for item in solutions]
     kb_texts = [doc["text"] for doc in kb_docs]
 
     # Calcola TUTTI gli embedding in un'unica chiamata batch: molto più veloce che
@@ -128,7 +160,7 @@ def main():
     all_texts = incident_texts + solution_texts + kb_texts
     all_vectors = embed_texts(all_texts)
 
-    # Ora dividiamo il grande blocco di vettori nei tre gruppi, nello stesso ordine
+    # Ora dividiamo il grande blocco di vettori nei due gruppi, nello stesso ordine
     # in cui li abbiamo concatenati. Usiamo lo slicing [inizio:fine] e un indice
     # scorrevole `idx`. (Il `;` separa due istruzioni sulla stessa riga.)
     idx = 0
@@ -164,7 +196,6 @@ def main():
     test_queries = [
         ("il disco del server è pieno", "past_incidents"),
         ("come gestire un errore del PLC", "knowledge_base"),
-        ("sensore di temperatura guasto sul macchinario", "verified_solutions"),
     ]
 
     # "for query, table in lista" spacchetta ogni tupla nelle due variabili.

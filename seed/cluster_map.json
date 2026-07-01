@@ -1,13 +1,17 @@
 {
-  "_note": "Questa mappa è la GROUND TRUTH per la valutazione del retrieval. Ogni cluster raggruppa incidenti RISOLTI che descrivono lo stesso tipo di problema con parole diverse. L'investigator deve recuperare i membri dello stesso cluster come simili. Solo gli incidenti risolti finiscono nel RAG (past_incidents).",
+  "_note": "Ground truth dei cluster ricorrenti usati per valutare il retrieval.",
   "clusters": {
-    "plc_error": {
-      "description": "Errori PLC o fermi macchinario in produzione",
-      "incident_ids": ["INC-001", "INC-002", "INC-003"]
+    "m365_authentication": {
+      "description": "Problemi di autenticazione o verifica account Microsoft 365",
+      "incident_ids": ["INC-001", "INC-004", "INC-008"]
     },
-    "db_connection_pool": {
-      "description": "Problemi di connessione al database sotto carico",
-      "incident_ids": ["INC-004", "INC-005", "INC-006"]
+    "tsplus_remote_session": {
+      "description": "Malfunzionamenti di applicazioni, finestre o periferiche in TSPlus",
+      "incident_ids": ["INC-003", "INC-007", "INC-009"]
+    },
+    "unreachable_network_device": {
+      "description": "Dispositivi alimentati ma non raggiungibili sulla rete corretta",
+      "incident_ids": ["INC-005", "INC-006", "INC-010"]
     }
   }
 }

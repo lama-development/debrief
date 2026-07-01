@@ -1,160 +1,72 @@
 [
   {
     "id": "INC-001",
-    "title": "PLC linea 2 in allarme: fermo produzione",
-    "description": "La linea di stampaggio 2 si è fermata improvvisamente. Il PLC mostra un codice di allarme 'Err 47 - Comm Fault' che non riusciamo a interpretare. Gli operatori hanno provato a riavviare ma l'errore persiste. La produzione della linea è completamente bloccata.",
-    "severity": "SEV1",
+    "title": "Errore TPM su dispositivo: impossibile accedere agli applicativi Microsoft 365",
+    "description": "Un dipendente segnala il seguente errore quando tenta di accedere agli applicativi Microsoft con l'utenza aziendale: \"Si è verificato un problema relativo a TPM (Trusted Platform Module) del dispositivo.\" L'utente non riesce ad autenticarsi su nessun applicativo Microsoft 365 (Outlook, Teams, OneDrive).",
+    "severity": "SEV3",
     "status": "resolved",
-    "root_cause": "Guasto al modulo di comunicazione Profinet del PLC. Il modulo aveva perso la sincronizzazione con i sensori della pressa, probabilmente per un picco di tensione durante la notte.",
-    "resolution_steps": [
-      "Contattato il fornitore PLC per assistenza remota",
-      "Diagnostica remota: identificato il modulo di comunicazione guasto",
-      "Sostituzione del modulo (intervento del fornitore in loco entro 4 ore)",
-      "Test di funzionamento e ripresa produzione"
-    ],
-    "impact": "Linea 2 ferma per 6 ore. Circa 2000 pezzi non prodotti.",
-    "detection": "Allarme sul quadro operatore e segnalazione immediata del capoturno.",
-    "created_at": "2025-01-15T06:15:00",
-    "resolved_at": "2025-01-15T12:30:00"
+    "resolution": "Il problema è causato dal cambio password dell'utente: il token di autenticazione memorizzato sul dispositivo non viene aggiornato automaticamente. Per risolvere: Impostazioni Windows → Account → Accesso aziendale o dell'istituto di istruzione → selezionare l'account aziendale → Disconnetti. Riavviare il PC e ricollegare l'account con le nuove credenziali.",
+    "created_at": "2025-09-10T09:15:00",
+    "resolved_at": "2025-09-10T10:00:00"
   },
   {
     "id": "INC-002",
-    "title": "Errore comunicazione PLC-SCADA sulla linea di estrusione",
-    "description": "Il sistema SCADA non riceve più i dati dalla linea di estrusione. I valori di temperatura e pressione sono fermi sul display. Il PLC sembra funzionare (i macchinari girano) ma la supervisione è cieca.",
-    "severity": "SEV2",
+    "title": "Esplora Risorse in freeze accedendo alle cartelle di srv-file1 da Wi-Fi",
+    "description": "Due dipendenti connessi alla rete Wi-Fi 'ADC-Office' non riescono ad aprire le cartelle del server 'srv-file1' tramite Esplora Risorse: l'applicazione va in freeze e deve essere chiusa forzatamente dal Task Manager. La root del server è accessibile, ma qualsiasi cartella al suo interno causa il blocco. Il riavvio di PC ed Esplora Risorse non risolve. Dall'accesso via TSPlus Remote Desktop il problema non si presenta. Sul PC di uno degli utenti le icone della taskbar apparivano trasparenti, sintomo di instabilità di Explorer.exe.",
+    "severity": "SEV3",
     "status": "resolved",
-    "root_cause": "Cavo Ethernet tra il PLC e lo switch industriale danneggiato. L'ambiente produttivo (calore, vibrazioni) aveva deteriorato il connettore RJ45 nel corso dei mesi.",
-    "resolution_steps": [
-      "Verifica della connettività tra PLC e switch industriale",
-      "Identificazione del cavo deteriorato",
-      "Sostituzione con cavo schermato e connettore industriale M12",
-      "Verifica della ripresa dei dati su SCADA"
-    ],
-    "impact": "Supervisione cieca sulla linea di estrusione per 3 ore. Rischio qualità.",
-    "detection": "Operatore SCADA ha notato i valori fermi a schermo.",
-    "created_at": "2025-01-28T13:40:00",
-    "resolved_at": "2025-01-28T16:50:00"
+    "resolution": "Explorer.exe va in crash/freeze in modo non recuperabile: riavviare il processo da Task Manager non risolve. L'unica soluzione è riavviare il PC. Workaround immediato mentre si aspetta il riavvio: accedere al file server tramite TSPlus Remote Desktop.",
+    "created_at": "2026-05-14T10:30:00",
+    "resolved_at": "2026-05-15T09:00:00"
   },
   {
     "id": "INC-003",
-    "title": "PLC linea 1: programma corrotto dopo blackout",
-    "description": "Dopo un'interruzione di corrente durante la notte, la linea 1 non riparte. Il PLC va in errore all'avvio e il programma sembra corrotto. Il display mostra 'Program Error - Checksum Mismatch'. Le altre linee sono ripartite normalmente.",
-    "severity": "SEV1",
+    "title": "TSPlus Remote App: disconnessione immediata dopo il login",
+    "description": "Gli utenti non riescono a connettersi a TSPlus tramite la modalità Remote App. Dopo aver inserito le credenziali la connessione viene tentata ma l'utente viene immediatamente disconnesso e la finestra remota non si apre. L'accesso tramite HTML e RDP funziona correttamente. Il problema riguarda tutti gli utenti che usano la modalità Remote App.",
+    "severity": "SEV2",
     "status": "resolved",
-    "root_cause": "La batteria di backup della memoria del PLC era scarica. L'interruzione di corrente ha causato la perdita del programma.",
-    "resolution_steps": [
-      "Contattato il fornitore PLC per il ripristino",
-      "Caricamento del backup del programma PLC",
-      "Verifica e ricalibrazione dei parametri",
-      "Sostituzione della batteria di backup",
-      "Pianificazione di backup periodici mensili del programma PLC"
-    ],
-    "impact": "Linea 1 ferma per un'intera giornata. Produzione spostata sulle altre linee con straordinari.",
-    "detection": "Capoturno del mattino ha trovato la linea in errore all'accensione.",
-    "created_at": "2025-02-03T05:30:00",
-    "resolved_at": "2025-02-03T17:00:00"
+    "resolution": "Il problema è causato da una corruzione o disallineamento del file AppControl.ini su srv-tsplus, che gestisce le autorizzazioni delle applicazioni remote. Per risolvere: accedere a srv-tsplus con utenza amministrativa, aprire TSPlus AdminTool, assegnare un'applicazione qualsiasi a un utente qualsiasi e poi rimuoverla (o qualsiasi operazione che forzi il salvataggio). Questo fa rigenerare il file AppControl.ini. Attendere circa 10 minuti per la propagazione: dopodiché la Remote App torna a funzionare per tutti gli utenti.",
+    "created_at": "2025-11-20T09:00:00",
+    "resolved_at": "2025-11-20T10:15:00"
   },
   {
     "id": "INC-004",
-    "title": "Applicativo gestionale lento, timeout sulle query",
-    "description": "L'ERP aziendale risponde con estrema lentezza da questa mattina. Gli utenti segnalano timeout quando provano a generare report o aprire ordini di produzione. Il problema peggiora nelle ore di punta.",
-    "severity": "SEV2",
+    "title": "Impossibile configurare MFA: sistema richiede codice MFA durante la stessa configurazione",
+    "description": "Durante la configurazione dell'MFA per l'account di una dipendente sullo smartphone condiviso del reparto Logistica, dopo aver inserito email e password il sistema richiede un codice MFA per procedere. Problema a catena: l'MFA è proprio ciò che si sta cercando di configurare, quindi il codice non è disponibile. Anche accedendo al portale web Microsoft (Informazioni di sicurezza) per gestire i metodi di verifica, il sistema chiede subito il codice MFA bloccando qualsiasi operazione.",
+    "severity": "SEV3",
     "status": "resolved",
-    "root_cause": "Il connection pool del database era saturo. Troppe connessioni rimaste aperte da sessioni non chiuse correttamente dall'applicativo dopo l'ultimo aggiornamento.",
-    "resolution_steps": [
-      "Riavvio del servizio database per liberare le connessioni pendenti",
-      "Aumento del limite del connection pool da 50 a 100",
-      "Segnalazione al fornitore software del bug nella gestione delle sessioni"
-    ],
-    "impact": "Tutti gli utenti dell'ERP (circa 30 persone) hanno avuto rallentamenti per 3 ore. Nessun dato perso.",
-    "detection": "Segnalazione degli utenti dell'ufficio acquisti.",
-    "created_at": "2025-03-18T08:30:00",
-    "resolved_at": "2025-03-18T11:45:00"
+    "resolution": "Non è possibile aggirare il blocco lato client: occorre che il provider Microsoft resetti l'MFA dell'utenza dal pannello di amministrazione. Aperto ticket a 2000net per il reset dell'MFA dell'account. Una volta effettuato il reset, l'utente può procedere alla configurazione dell'app Authenticator senza che venga richiesto un codice preesistente.",
+    "created_at": "2025-10-08T10:30:00",
+    "resolved_at": "2025-10-08T14:00:00"
   },
   {
     "id": "INC-005",
-    "title": "Database PostgreSQL: troppe connessioni attive",
-    "description": "Il monitoraggio segnala che il numero di connessioni attive al database ha superato il 90% del limite massimo. Alcune query iniziano a fallire con errore 'too many connections'. Il gestionale funziona a singhiozzo.",
-    "severity": "SEV2",
+    "title": "Access Point AP15-MagazzinoMP offline: problemi di connessione sui tablet",
+    "description": "L'Access Point 'AP15-MagazzinoMP' risulta offline dalla mattinata sulla dashboard UniFi Network. Il dispositivo non è raggiungibile (Device Unreachable), pertanto non è possibile eseguirne il riavvio da remoto. Contestualmente vengono segnalati problemi di connessione sui tablet serviti dall'Access Point.",
+    "severity": "SEV3",
     "status": "resolved",
-    "root_cause": "Connection pool esaurito. Il nuovo modulo di reportistica apriva connessioni senza rilasciarle, accumulandole nel corso della giornata.",
-    "resolution_steps": [
-      "Kill delle connessioni idle da più di 30 minuti",
-      "Configurazione di un timeout sulle connessioni inattive (idle_in_transaction_session_timeout)",
-      "Coordinamento con il fornitore software per il fix del modulo reportistica"
-    ],
-    "impact": "Rallentamenti intermittenti per 2 ore su tutti gli applicativi che usano il database.",
-    "detection": "Alert automatico sul numero di connessioni attive.",
-    "created_at": "2025-04-22T14:10:00",
-    "resolved_at": "2025-04-22T16:30:00"
+    "resolution": "La causa è riconducibile a un danneggiamento accidentale: durante l'installazione di una linea, il giorno precedente, il ripetitore è stato piegato dagli operai. In seguito alla verifica del dispositivo, l'Access Point è tornato online e risulta regolarmente funzionante.",
+    "created_at": "2026-06-30T09:00:00",
+    "resolved_at": "2026-06-30T12:00:00"
   },
   {
     "id": "INC-006",
-    "title": "Errore connessione DB durante chiusura mensile",
-    "description": "Durante la chiusura contabile di fine mese, il software di contabilità ha smesso di rispondere. L'errore nei log è 'connection refused' verso il server database. Si è presentato quando diversi utenti hanno lanciato contemporaneamente i report di chiusura.",
-    "severity": "SEV1",
+    "title": "Timbratore del trituratore non raggiungibile: timbrature mancanti",
+    "description": "Dal controllo delle timbrature risultano registrazioni mancanti, soprattutto in uscita, provenienti dal timbratore del trituratore. L'anomalia impedisce la corretta chiusura delle giornate nel gestionale. Durante la verifica sul campo il dispositivo risulta alimentato e la porta dello switch presenta il link di rete attivo, ma il timbratore non è raggiungibile neppure da un PC collegato alla stessa VLAN. Inizialmente non è possibile stabilire se la causa dipenda dal dispositivo, dalla configurazione dello switch o dalla tratta del cavo; viene quindi coinvolta 2000net per ulteriori verifiche.",
+    "severity": "SEV3",
     "status": "resolved",
-    "root_cause": "Il pool di connessioni era dimensionato per il carico normale ma non per il picco della chiusura mensile. Tutte le connessioni occupate dai report pesanti, nessuna disponibile per le operazioni normali.",
-    "resolution_steps": [
-      "Riavvio del servizio database in emergenza",
-      "Scaglionamento dei report di chiusura su fasce orarie diverse",
-      "Aumento permanente del pool e aggiunta di connection queueing"
-    ],
-    "impact": "Blocco completo della contabilità per 1.5 ore durante la chiusura mensile.",
-    "detection": "Chiamata urgente dalla responsabile amministrativa.",
-    "created_at": "2025-06-30T09:00:00",
-    "resolved_at": "2025-06-30T10:30:00"
+    "resolution": "Il cavo di rete del timbratore era collegato alla porta 6 dello switch anziché alla porta 7, dedicata ai timbratori e configurata sulla VLAN corretta. Di conseguenza il dispositivo non era raggiungibile e non riusciva a trasmettere le timbrature al gestionale. Il cavo è stato spostato sulla porta corretta: il timbratore ha ripreso a funzionare e la registrazione delle timbrature è stata verificata con esito positivo sul gestionale.",
+    "created_at": "2026-06-29T14:00:00",
+    "resolved_at": "2026-06-30T10:00:00"
   },
   {
     "id": "INC-007",
-    "title": "Server principale: disco pieno, servizi bloccati",
-    "description": "Il server principale non risponde più. Tentando l'accesso remoto via RDP il login fallisce. Collegandosi fisicamente, il sistema segnala disco C: pieno al 100%. Tutti i servizi ospitati (file server, print server, DHCP) sono giù.",
-    "severity": "SEV1",
-    "status": "resolved",
-    "root_cause": "I log di Windows Event non venivano ruotati da mesi e hanno occupato 180GB. Il disco si è riempito gradualmente senza che nessun alert fosse configurato.",
-    "resolution_steps": [
-      "Accesso fisico al server e pulizia dei log più vecchi di 30 giorni",
-      "Liberati 160GB, riavvio dei servizi",
-      "Configurazione della rotazione automatica dei log",
-      "Configurazione di un alert quando il disco supera l'80%"
-    ],
-    "impact": "Tutti i servizi di rete giù per 1.5 ore. Nessuno poteva stampare, accedere ai file condivisi o ottenere un IP.",
-    "detection": "Segnalazioni multiple da tutti i reparti all'apertura degli uffici.",
-    "created_at": "2025-07-15T08:00:00",
-    "resolved_at": "2025-07-15T09:30:00"
-  },
-  {
-    "id": "INC-008",
-    "title": "Certificato VPN scaduto: nessuno riesce a collegarsi",
-    "description": "Da stamattina nessun utente riesce a stabilire la connessione VPN. Il client VPN mostra 'Certificate validation failed'. Il problema riguarda tutti gli utenti senza eccezione. Ieri sera funzionava tutto.",
-    "severity": "SEV2",
-    "status": "resolved",
-    "root_cause": "Il certificato SSL del server VPN è scaduto durante la notte. Non era stato impostato nessun promemoria per il rinnovo.",
-    "resolution_steps": [
-      "Rinnovo del certificato SSL sul server VPN",
-      "Riavvio del servizio VPN",
-      "Test di connessione con un utente remoto",
-      "Impostazione di un reminder per il rinnovo (90 giorni prima della scadenza)"
-    ],
-    "impact": "Tutti i lavoratori remoti bloccati per 1.5 ore.",
-    "detection": "Chiamate simultanee da tutti i dipendenti in smart working.",
-    "created_at": "2025-10-01T08:30:00",
-    "resolved_at": "2025-10-01T10:00:00"
-  },
-  {
-    "id": "INC-009",
-    "title": "Client di posta bloccato: allegati non si aprono",
-    "description": "Diversi utenti segnalano che non riescono ad aprire gli allegati ricevuti via email. Outlook mostra 'Impossibile aprire il file'. Riguarda tutti i tipi di allegati (PDF, Excel, Word). Salvando l'allegato sul desktop, si apre normalmente.",
-    "severity": "SEV4",
-    "status": "active",
-    "created_at": "2026-06-11T09:45:00"
-  },
-  {
-    "id": "INC-010",
-    "title": "Perdita pacchetti sulla rete del magazzino",
-    "description": "I terminali barcode del magazzino perdono frequentemente la connessione WiFi. Le letture dei codici a barre non vengono registrate e gli operatori devono ripetere le operazioni. Il problema è intermittente e peggiora verso il fondo del capannone.",
+    "title": "TSPlus: finestra modale di Embyon aperta fuori dall'area visibile",
+    "description": "Nella sessione TSPlus di un dipendente, l'apertura di una finestra modale di Embyon disabilita correttamente la finestra principale, ma la modale non appare nell'area visibile. Il problema si presenta con RemoteApp, client HTML5 e desktop remoto completo. La finestra, essendo associata allo stesso processo, non compare in Alt+Tab e non può essere recuperata con le consuete scorciatoie da tastiera. Il comportamento è compatibile con il ripristino di coordinate salvate al di fuori dell'area visibile, probabilmente a seguito di un cambio di risoluzione o configurazione dei monitor. L'anomalia riguarda un solo utente, privo dei privilegi necessari per modificare la risoluzione della sessione.",
     "severity": "SEV3",
-    "status": "active",
-    "created_at": "2026-06-12T10:00:00"
+    "status": "resolved",
+    "resolution": "La finestra è stata recuperata tramite Task Manager: è stato prima minimizzato Embyon e successivamente è stata massimizzata la finestra del prelievo. La visualizzazione è così tornata corretta per l'utente.",
+    "created_at": "2026-06-30T13:00:00",
+    "resolved_at": "2026-06-30T14:00:00"
   }
 ]
