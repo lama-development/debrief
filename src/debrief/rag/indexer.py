@@ -12,19 +12,14 @@ Gestisce le tre collezioni (tabelle):
 """
 
 import os
-import json
 import lancedb
-import pyarrow as pa   # pyarrow è il formato dati su cui si appoggia LanceDB
-
-# Dimensione del vettore (paraphrase-multilingual-MiniLM-L12-v2 = 384 numeri).
-# Tutti i vettori in una tabella devono avere la stessa dimensione.
-VECTOR_DIM = 384
+from debrief.config import LANCEDB_PATH
 
 
 def get_db(db_path: str | None = None) -> lancedb.DBConnection:
     """Apre (o crea) il database LanceDB."""
     if db_path is None:
-        db_path = os.getenv("LANCEDB_PATH", "data/lancedb")
+        db_path = os.getenv("LANCEDB_PATH", LANCEDB_PATH)
     os.makedirs(db_path, exist_ok=True)
     # connect apre la cartella come database; crea i file necessari se mancano.
     return lancedb.connect(db_path)
@@ -40,12 +35,9 @@ def _incident_record(inc: dict, vec: list[float]) -> dict:
         "id": inc["id"],
         "title": inc["title"],
         "severity": inc.get("severity", ""),
-        "text": _build_incident_text(inc),  # il testo che è stato incorporato
-        "root_cause": inc.get("root_cause", ""),
-        # resolution_steps è una lista; LanceDB qui salva una stringa, quindi la
-        # serializziamo in JSON (e la ri-parseremo alla lettura se serve).
-        "resolution_steps": json.dumps(inc.get("resolution_steps", []), ensure_ascii=False),
-        "vector": vec,   # l'embedding: è la colonna su cui avviene la ricerca
+        "text": _build_incident_text(inc),
+        "resolution": inc.get("resolution", ""),
+        "vector": vec,
     }
 
 
@@ -95,10 +87,13 @@ def index_knowledge_base(db: lancedb.DBConnection, docs: list[dict], vectors: li
     return len(records)
 
 
-def index_verified_solutions(db: lancedb.DBConnection, solutions: list[dict], vectors: list[list[float]]):
-    """Indicizza le soluzioni verificate da umani."""
-    records = [_solution_record(sol, vec) for sol, vec in zip(solutions, vectors)]
-
+def index_verified_solutions(
+    db: lancedb.DBConnection,
+    solutions: list[dict],
+    vectors: list[list[float]],
+) -> int:
+    """Ricrea la collezione delle soluzioni umane fornite nel seed."""
+    records = [_solution_record(solution, vector) for solution, vector in zip(solutions, vectors)]
     db.create_table("verified_solutions", data=records, mode="overwrite")
     return len(records)
 
@@ -176,16 +171,9 @@ def search(db: lancedb.DBConnection, table_name: str, query_vector: list[float],
 
 def _build_incident_text(incident: dict) -> str:
     """Costruisce il testo da incorporare per un incidente.
-    Combina descrizione, root cause e risoluzione per massimizzare il retrieval."""
-    # Mettiamo insieme più campi così la ricerca funziona sia se l'utente descrive
-    # i SINTOMI (description) sia se cerca per CAUSA o SOLUZIONE.
+    Combina descrizione e risoluzione per massimizzare il retrieval."""
     parts = [
         incident.get("description", ""),
-        incident.get("root_cause", ""),
+        incident.get("resolution", ""),
     ]
-    steps = incident.get("resolution_steps", [])
-    if steps:
-        # I passi sono una lista: li uniamo in un'unica stringa prima di aggiungerli.
-        parts.append(" ".join(steps))
-    # Uniamo tutti i pezzi con uno spazio: è questo il testo che verrà embeddato.
-    return " ".join(parts)
+    return " ".join(p for p in parts if p)

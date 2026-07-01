@@ -34,6 +34,7 @@ You use a hybrid grounding approach with mandatory source labeling:
 4. **GENERAL KNOWLEDGE**: If none of the above provides a solution, you MAY propose steps based on general IT best practices, but you MUST label them clearly: "[Best practice generale - non da casi precedenti]"
 
 NEVER present general knowledge as if it came from past incidents or verified solutions. The user must always see where each suggestion comes from.
+When citing a source, copy its identifier EXACTLY from the tool result. Never invent, complete, or use example identifiers such as VS-123 or INC-999. If a tool returned no identifier, do not add one.
 
 ## SEARCH STRATEGY
 Always search in this order:
@@ -58,7 +59,7 @@ def create_resolver_agent() -> Agent:
     """Crea e restituisce il resolver agent configurato."""
     return Agent(
         name="Resolver Agent",
-        model=Groq(id=MODELS["resolver"]),
+        model=Groq(id=MODELS["resolver"], temperature=TEMPERATURE["resolver"]),
         description="Propone passi di risoluzione per gli incidenti basandosi su knowledge base e incidenti passati.",
         instructions=RESOLVER_INSTRUCTIONS,
         # L'ordine della lista riflette la priorità suggerita nel prompt: prima le
@@ -69,19 +70,22 @@ def create_resolver_agent() -> Agent:
     )
 
 
-def build_resolution_prompt(incident_description: str, additional_context: str = "") -> str:
-    """Costruisce il prompt di remediation. Estratto come funzione pura così che
-    sia il percorso bloccante (resolve) sia lo streaming (service layer) usino
-    esattamente lo stesso prompt."""
-    # Prompt base con la descrizione dell'incidente (delimitata = prompt difensivo).
+def build_resolution_prompt(incident_description: str, additional_context: str = "", investigation_summary: str = "") -> str:
+    """Costruisce il prompt di remediation."""
     prompt = f"""Propose remediation steps for the following incident:
 
 <incident_description>
 {incident_description}
 </incident_description>"""
 
-    # `+=` concatena: se c'è contesto aggiuntivo (es. richiesta dell'utente, output
-    # del triage) lo accodiamo in un blocco separato.
+    if investigation_summary:
+        prompt += f"""
+
+<investigation_findings>
+The Investigator Agent already searched for similar past incidents. Use these findings to inform your remediation:
+{investigation_summary}
+</investigation_findings>"""
+
     if additional_context:
         prompt += f"""
 

@@ -10,6 +10,7 @@ usa output_schema + use_json_mode (vedi sotto).
 """
 
 import json
+import logging
 # Agno è il framework multi-agente. Agent = la classe dell'agente; RunOutput = il
 # tipo del risultato di agent.run().
 from agno.agent import Agent, RunOutput
@@ -18,6 +19,8 @@ from agno.models.groq import Groq
 
 from debrief.config import MODELS, TEMPERATURE
 from debrief.schemas import TriageOutput
+
+logger = logging.getLogger(__name__)
 
 
 def build_system_prompt(teams: list[dict]) -> str:
@@ -47,6 +50,12 @@ def build_system_prompt(teams: list[dict]) -> str:
     - SEV3 (Moderate): Minor functionality impaired, workaround exists. Can wait for normal working hours.
     - SEV4 (Low): Minimal or cosmetic impact. No urgency.
 
+    Apply these boundaries consistently:
+    - Choose SEV1 when a production line is completely stopped, the whole company is offline, or multiple core services are unavailable with no workaround.
+    - Choose SEV3 when the impact is limited to one device, one department, or a small group and a workaround or alternative channel exists.
+    - Choose SEV2 only for the middle ground: broad or urgent impact that is neither a complete critical outage nor a limited moderate incident.
+    - Do not default to SEV2 merely because the incident sounds important; use the affected scope and availability of a workaround.
+
     ## AVAILABLE TEAMS
     You may ONLY suggest teams from this list (use the ID, not the name):
     {teams_list}
@@ -65,7 +74,7 @@ def create_triage_agent(teams: list[dict]) -> Agent:
     """Crea e restituisce il triage agent configurato."""
     return Agent(
         name="Triage Agent",
-        model=Groq(id=MODELS["triage"]),                  # quale LLM usare (da config)
+        model=Groq(id=MODELS["triage"], temperature=TEMPERATURE["triage"]),
         description="Classifica incidenti IT in base alla descrizione fornita.",
         instructions=build_system_prompt(teams),          # il system prompt costruito sopra
         # output_schema dice ad Agno: "voglio che la risposta sia un TriageOutput".
@@ -113,13 +122,13 @@ def run_triage(agent: Agent, incident_description: str) -> TriageOutput | None:
             return TriageOutput(**data)
 
         # Tipo inatteso: meglio None che un crash.
-        print(f"🔴 Unexpected response type: {type(response.content)}")
+        logger.error("Unexpected triage response type: %s", type(response.content))
         return None
 
     except Exception as e:
         # Qualunque errore (rete, JSON malformato, validazione fallita) → None.
         # Il chiamante (orchestrator/service) gestisce il None mostrando un messaggio.
-        print(f"🔴 Triage failed: {e}")
+        logger.exception("Triage failed")
         return None
 
 
@@ -136,5 +145,5 @@ def validate_teams(triage: TriageOutput, valid_team_ids: set[str]) -> TriageOutp
     triage.suggested_teams = [t for t in triage.suggested_teams if t in valid_team_ids]
     removed = original_count - len(triage.suggested_teams)
     if removed > 0:
-        print(f"🔵 Removed {removed} invalid team suggestion(s)")
+        logger.info("Removed %s invalid team suggestion(s)", removed)
     return triage

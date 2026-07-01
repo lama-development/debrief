@@ -10,7 +10,12 @@ Tutto avviene in locale, senza usare API, costi aggiuntivi, o rate limit.
 """
 
 import os
+import logging
 from sentence_transformers import SentenceTransformer
+
+from debrief.config import EMBEDDING_MODEL
+
+logger = logging.getLogger(__name__)
 
 # Il modello viene caricato UNA volta e riusato (pattern "singleton").
 # Caricare il modello è lento; tenerlo in questa variabile globale evita di
@@ -25,10 +30,10 @@ def get_model() -> SentenceTransformer:
     global _model
     # Carichiamo solo se non è ancora stato caricato (lazy loading).
     if _model is None:
-        model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
-        print(f"🔵 Loading embedding model: {model_name}...")
+        model_name = os.getenv("EMBEDDING_MODEL", EMBEDDING_MODEL)
+        logger.info("Loading embedding model: %s", model_name)
         _model = SentenceTransformer(model_name)
-        print(f"🟢 Model loaded (vector dimension: {_model.get_embedding_dimension()})")
+        logger.info("Embedding model loaded (dimension=%s)", _model.get_embedding_dimension())
     return _model
 
 
@@ -56,5 +61,5 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 # Test rapido se esegui il file direttamente (vedi nota su __main__ in database.py).
 if __name__ == "__main__":
     test = embed_text("PLC fermo in produzione, linea bloccata")
-    print(f"🟢 Embedding computed: {len(test)} dimensions")
+    print(f"Embedding computed: {len(test)} dimensions")
     print(f"First 5 values: {test[:5]}")   # test[:5] = i primi 5 elementi (slicing)

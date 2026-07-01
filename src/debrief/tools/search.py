@@ -11,9 +11,11 @@ Per questo i docstring qui sono in inglese e molto descrittivi: li "legge" il mo
 Ogni funzione restituisce una STRINGA leggibile che l'agente usa nella sua risposta.
 """
 
-from debrief.tools.embedding import embed_text
-from debrief.rag.indexer import get_db, search
-from debrief.config import SIMILARITY_THRESHOLD, TOP_K_INCIDENTS, TOP_K_VERIFIED, TOP_K_KB
+from debrief.rag.retriever import (
+    retrieve_knowledge,
+    retrieve_similar_incidents,
+    retrieve_verified_solutions,
+)
 
 
 def search_past_incidents(query: str) -> str:
@@ -30,9 +32,7 @@ def search_past_incidents(query: str) -> str:
     """
     # 1. Trasforma la query in vettore. 2. Apre il DB vettoriale. 3. Cerca i k più
     # simili sopra la soglia.
-    query_vector = embed_text(query)
-    db = get_db()
-    results = search(db, "past_incidents", query_vector, k=TOP_K_INCIDENTS, threshold=SIMILARITY_THRESHOLD)
+    results = retrieve_similar_incidents(query)
 
     # `if not results` → vero se la lista è vuota. Importante: diciamo all'agente
     # che non c'è nulla, così NON inventa incidenti (regola anti-allucinazione).
@@ -45,15 +45,12 @@ def search_past_incidents(query: str) -> str:
     for r in results:
         # _distance è la distanza L2 restituita da LanceDB; con vettori normalizzati
         # similarità coseno = 1 - distanza/2. (Vedi spiegazione in indexer.search.)
-        similarity = 1 - r["_distance"] / 2
+        similarity = r["similarity"]
         output_parts.append(
-            # :.0% formatta un numero come percentuale senza decimali (0.87 -> "87%").
-            # r.get('root_cause', 'N/A') → 'N/A' se il campo manca.
             f"--- Incident {r['id']} (similarity: {similarity:.0%}) ---\n"
             f"Title: {r['title']}\n"
             f"Severity: {r['severity']}\n"
-            f"Root cause: {r.get('root_cause', 'N/A')}\n"
-            f"Resolution: {r.get('resolution_steps', 'N/A')}\n"
+            f"Resolution: {r.get('resolution', 'N/A')}\n"
         )
 
     # "\n".join(lista) → unisce i pezzi separandoli con un a-capo.
@@ -71,16 +68,14 @@ def search_knowledge_base(query: str) -> str:
     Returns:
         Relevant knowledge base articles, or a message saying nothing was found.
     """
-    query_vector = embed_text(query)
-    db = get_db()
-    results = search(db, "knowledge_base", query_vector, k=TOP_K_KB, threshold=SIMILARITY_THRESHOLD)
+    results = retrieve_knowledge(query)
 
     if not results:
         return "No relevant knowledge base articles found."
 
     output_parts = [f"Found {len(results)} relevant article(s):\n"]
     for r in results:
-        similarity = 1 - r["_distance"] / 2
+        similarity = r["similarity"]
         # Tronca il testo a 1500 caratteri per non esplodere il contesto: i
         # runbook possono essere lunghi e l'LLM ha un limite di token.
         text = r.get("text", "")
@@ -105,16 +100,14 @@ def search_verified_solutions(query: str) -> str:
     Returns:
         Verified solutions with their context, or a message saying none were found.
     """
-    query_vector = embed_text(query)
-    db = get_db()
-    results = search(db, "verified_solutions", query_vector, k=TOP_K_VERIFIED, threshold=SIMILARITY_THRESHOLD)
+    results = retrieve_verified_solutions(query)
 
     if not results:
         return "No verified human solutions found for this type of problem."
 
     output_parts = [f"Found {len(results)} verified solution(s):\n"]
     for r in results:
-        similarity = 1 - r["_distance"] / 2
+        similarity = r["similarity"]
         output_parts.append(
             f"--- Solution {r['id']} (relevance: {similarity:.0%}) ---\n"
             f"Problem context: {r.get('problem_context', 'N/A')}\n"
