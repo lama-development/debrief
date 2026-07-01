@@ -20,7 +20,6 @@ export interface Incident {
   severity: Severity | null
   status: IncidentStatus
   created_by: string | null
-  session_id: string | null
   created_at: string
   updated_at: string
   resolved_at: string | null
@@ -36,31 +35,33 @@ export interface TimelineEvent {
   content: string | null
 }
 
-export interface RemediationStep {
-  id: number
-  incident_id: string
-  description: string
-  completed: number // SQLite: 0 | 1
-  source: string
-}
-
 export interface PostMortem {
   incident_id: string
   title: string
   severity: Severity
-  impact?: string
-  detection?: string
-  root_cause?: string
-  resolution_steps?: string[]
-  action_items?: string[]
-  references?: string[]
+  resolution?: string
   timeline?: TimelineEvent[]
 }
 
+export interface IncidentParticipant {
+  id: string
+  username: string
+  joined_at: string
+  last_activity_at: string
+}
+
 export interface IncidentDetail extends Incident {
+  involved_teams: string[]
   timeline: TimelineEvent[]
-  remediation: RemediationStep[]
   post_mortem: PostMortem | null
+  participants: IncidentParticipant[]
+}
+
+export interface ClassificationOverrideRequest {
+  severity?: Severity
+  add_teams?: string[]
+  remove_teams?: string[]
+  reason?: string
 }
 
 export interface Metrics {
@@ -74,12 +75,23 @@ export interface Metrics {
 export interface TriageData {
   title: string
   severity: Severity
-  affected_systems: string[]
   suggested_teams: string[]
   summary: string
   needs_clarification: boolean
   clarifying_questions: string[]
   confidence: number
+}
+
+export interface OverrideProposal {
+  severity: Severity | null
+  add_teams: string[]
+  remove_teams: string[]
+  description: string
+}
+
+export interface HumanHelpRequest {
+  problem_context: string
+  reason: string
 }
 
 // Eventi emessi dallo streaming della chat (service.stream_chat).
@@ -88,5 +100,8 @@ export type ChatEvent =
   | { type: "tool"; name: string }
   | { type: "token"; content: string }
   | { type: "triage"; data: TriageData }
+  | { type: "phase"; agent: AgentRole }
+  | { type: "override_proposed"; data: OverrideProposal }
+  | { type: "human_help_required"; data: HumanHelpRequest }
   | { type: "done"; status: IncidentStatus; incident_id: string }
   | { type: "error"; message: string }

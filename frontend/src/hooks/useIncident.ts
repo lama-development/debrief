@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { incidentsApi } from "@/lib/api"
 
-// Dettaglio completo di un incidente (campi + timeline + remediation + post-mortem).
+// Dettaglio completo di un incidente (campi + timeline + post-mortem).
 export function useIncident(id: string) {
   return useQuery({
     queryKey: ["incident", id],
@@ -24,8 +24,8 @@ function useLifecycleInvalidation(id: string) {
 export function useResolveIncident(id: string) {
   const invalidate = useLifecycleInvalidation(id)
   return useMutation({
-    mutationFn: (vars: { resolution_summary: string; verified_solution?: string }) =>
-      incidentsApi.resolve(id, vars.resolution_summary, vars.verified_solution),
+    mutationFn: (vars: { resolution_summary: string }) =>
+      incidentsApi.resolve(id, vars.resolution_summary),
     onSuccess: invalidate,
   })
 }

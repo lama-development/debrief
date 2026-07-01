@@ -4,6 +4,7 @@
 // - normalizza gli errori in ApiError con messaggio leggibile.
 
 import type {
+  ClassificationOverrideRequest,
   Incident,
   IncidentDetail,
   Metrics,
@@ -123,12 +124,19 @@ export const incidentsApi = {
   create: (description: string) =>
     request<Incident>("/incidents", { method: "POST", body: { description } }),
   detail: (id: string) => request<IncidentDetail>(`/incidents/${id}`),
-  resolve: (id: string, resolution_summary: string, verified_solution?: string) =>
+  resolve: (id: string, resolution_summary: string) =>
     request<Incident>(`/incidents/${id}/resolve`, {
       method: "POST",
-      body: { resolution_summary, verified_solution: verified_solution || null },
+      body: { resolution_summary },
     }),
   reopen: (id: string) => request<Incident>(`/incidents/${id}/reopen`, { method: "POST" }),
+  patchClassification: (id: string, body: ClassificationOverrideRequest) =>
+    request<Incident>(`/incidents/${id}/classification`, { method: "PATCH", body }),
+  addVerifiedSolution: (id: string, solution: string) =>
+    request(`/incidents/${id}/verified-solutions`, {
+      method: "POST",
+      body: { solution },
+    }),
 }
 
 // --- Metriche ---
