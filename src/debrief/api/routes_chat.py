@@ -28,6 +28,7 @@ def chat(incident_id: str, body: ChatRequest, user: dict = Depends(auth.current_
     # streaming, lo status code HTTP è già stato inviato e non si può più cambiare.
     if service.get_incident_detail(incident_id) is None:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+    service.join_incident(incident_id, user["id"])
 
     # Generator expression: avvolge ogni evento prodotto da stream_chat in un frame
     # SSE. È "pigra" (lazy): i frame vengono prodotti uno a uno man mano che servono,

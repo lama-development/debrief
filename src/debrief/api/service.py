@@ -14,20 +14,26 @@ serve un refactor async.
 """
 
 import json
+import logging
+import uuid
 from datetime import datetime, timezone
 
 # Tipi di evento che Agno emette durante lo streaming di un agente: contenuto
 # (token), completamento, inizio chiamata a un tool. Li riconosciamo con isinstance.
-from agno.run.agent import RunContentEvent, RunCompletedEvent, ToolCallStartedEvent
+from agno.run.agent import RunContentEvent, RunCompletedEvent, ToolCallCompletedEvent, ToolCallStartedEvent
 
 from debrief import database as db
 from debrief.agents.orchestrator import create_router_agent, route_message
 from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
 from debrief.agents.investigator import create_investigator_agent, build_investigation_prompt
 from debrief.agents.resolver import create_resolver_agent, build_resolution_prompt
+from debrief.api.lifecycle import advance_status
 from debrief.rag.indexer import get_db, add_past_incident, add_verified_solution, _build_incident_text
-from debrief.schemas import AgentRole, PostMortem, Severity, TimelineEvent
+from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, PostMortem, RoutingDecision, Severity, TimelineEvent, TriageOutput, VerifiedSolution
 from debrief.tools.embedding import embed_text
+
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -43,31 +49,6 @@ from debrief.tools.embedding import embed_text
 # interne, la transizione semplicemente non avviene (vedi advance_status).
 # evento -> {stato_di_partenza: stato_di_arrivo}
 # Ciclo di vita a 3 stati: open -> active -> resolved (riapribile).
-TRANSITIONS: dict[str, dict[str, str]] = {
-    "TRIAGE_CLASSIFIED":          {"open": "active"},
-    "TRIAGE_NEEDS_CLARIFICATION": {"open": "open"},        # resta aperto in attesa di dettagli
-    "RESOLUTION_STARTED":         {"open": "active", "active": "active"},
-    "RESOLVED":                   {"open": "resolved", "active": "resolved"},
-    "REOPENED":                   {"resolved": "active"},
-}
-
-# Eventi prodotti automaticamente dall'attività degli agenti (durante la chat).
-AUTOMATIC_EVENTS = {"TRIAGE_CLASSIFIED", "TRIAGE_NEEDS_CLARIFICATION", "RESOLUTION_STARTED"}
-# Eventi che richiedono un'azione esplicita dell'utente/API (mai dalla chat).
-EXPLICIT_EVENTS = {"RESOLVED", "REOPENED"}
-
-
-def advance_status(current: str, event: str) -> str:
-    """Restituisce il nuovo stato per l'evento dato, o `current` invariato se
-    la transizione non è consentita dallo stato corrente."""
-    # Doppio .get con default:
-    #   TRANSITIONS.get(event, {})  → la mappa dell'evento, o {} se evento ignoto
-    #   .get(current, current)      → il nuovo stato, o `current` se la transizione
-    #                                 non è prevista da questo stato.
-    # Risultato: una transizione non valida NON cambia nulla (no eccezioni).
-    return TRANSITIONS.get(event, {}).get(current, current)
-
-
 # ---------------------------------------------------------------------------
 # Helper SSE
 # ---------------------------------------------------------------------------
@@ -108,8 +89,11 @@ def stream_chat(incident_id: str, message: str, user_id: str):
             yield {"type": "error", "message": f"Incident {incident_id} not found"}
             return
 
+        db.add_incident_participant(incident_id, user_id)
+
         status = incident["status"]
         description = incident["description"]
+        conversation_context = _conversation_context(incident_id)
 
         # 1. Persisti il messaggio dell'utente in timeline.
         db.add_timeline_event(incident_id, "message", user_id, message)
@@ -120,17 +104,51 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         decision = route_message(router, message, status, description)
         yield {"type": "routing", "agent": decision.agent.value, "reason": decision.reason}
 
-        # 3-4. Esegui l'agente scelto. `yield from sotto_generatore` inoltra al
-        #      chiamante TUTTI gli eventi prodotti dal sotto-generatore e, alla fine,
-        #      cattura il valore che quello RESTITUISCE con `return` (qui: il nome
-        #      dell'evento di transizione di stato, o None). È il modo elegante per
-        #      comporre generatori.
+        # 3-4. Esegui l'agente scelto.
         if decision.agent == AgentRole.TRIAGE:
-            event_name = yield from _stream_triage(incident_id, message)
+            event_name, triage_result = yield from _stream_triage(
+                incident_id, message, description, conversation_context
+            )
+
+            # Pipeline automatica: dopo una classificazione riuscita, catena
+            # immediatamente investigator e resolver senza aspettare input utente.
+            if event_name == "TRIAGE_CLASSIFIED" and triage_result is not None:
+                triage_ctx = _format_triage_context(triage_result)
+
+                yield {"type": "phase", "agent": "investigator"}
+                investigation_summary = yield from _stream_investigator(
+                    incident_id,
+                    "Cerca incidenti simili e identifica possibili cause radice.",
+                    description,
+                    triage_context=triage_ctx,
+                    conversation_context=conversation_context,
+                )
+
+                yield {"type": "phase", "agent": "resolver"}
+                yield from _stream_resolver(
+                    incident_id,
+                    "",
+                    description,
+                    triage_context=triage_ctx,
+                    investigation_summary=investigation_summary or "",
+                    conversation_context=conversation_context,
+                )
+                event_name = "RESOLUTION_STARTED"
+
         elif decision.agent == AgentRole.INVESTIGATOR:
-            event_name = yield from _stream_investigator(incident_id, message, description)
+            yield from _stream_investigator(
+                incident_id, message, description,
+                conversation_context=conversation_context,
+            )
+            event_name = None
         elif decision.agent == AgentRole.RESOLVER:
-            event_name = yield from _stream_resolver(incident_id, message, description)
+            event_name = yield from _stream_resolver(
+                incident_id, message, description,
+                conversation_context=conversation_context,
+            )
+        elif decision.agent == AgentRole.OVERRIDE:
+            yield from _stream_override(decision)
+            event_name = None
         else:  # AgentRole.NONE → nessun agente da eseguire
             event_name = None
 
@@ -150,24 +168,27 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         yield {"type": "error", "message": str(e)}
 
 
-def _stream_triage(incident_id: str, message: str):
-    """Triage: output STRUTTURATO, quindi gira bloccante (non si fa token streaming
-    di un oggetto Pydantic). Emette i dati strutturati + il summary testuale, poi
-    persiste la classificazione. Restituisce l'evento di transizione."""
+def _stream_triage(incident_id: str, message: str, description: str = "",
+                   conversation_context: str = ""):
+    """Triage: output strutturato. Restituisce tupla (event_name, triage_result)."""
     teams, valid_ids = db.get_teams()
     agent = create_triage_agent(teams)
-    triage = run_triage(agent, message)
+    triage_input = message
+    if conversation_context:
+        triage_input = (
+            f"Descrizione originale: {description}\n\n"
+            f"Cronologia precedente:\n{conversation_context}\n\n"
+            f"Nuovo messaggio: {message}"
+        )
+    triage = run_triage(agent, triage_input)
 
     if triage is None:
         text = "Impossibile classificare l'incidente. Riprova con una descrizione più dettagliata."
         yield {"type": "token", "content": text}
         db.add_timeline_event(incident_id, "triage", "triage", text)
-        return None  # `return None` da un generatore = valore catturato dal `yield from`: nessuna transizione
+        return None, None
 
     triage = validate_teams(triage, valid_ids)
-    # .model_dump(mode="json") = metodo Pydantic che converte l'oggetto in un dict
-    # JSON-compatibile (es. gli Enum diventano stringhe, le date diventano testo).
-    # Emettiamo un evento "triage" con i dati STRUTTURATI: la UI può disegnarci una card.
     yield {"type": "triage", "data": triage.model_dump(mode="json")}
 
     if triage.needs_clarification:
@@ -177,40 +198,110 @@ def _stream_triage(incident_id: str, message: str):
         text = f"{triage.summary}\n\nHo bisogno di alcune informazioni aggiuntive:\n{questions}"
     else:
         text = triage.summary
-    # Emettiamo anche il testo (summary) come evento "token" da mostrare in chat.
     yield {"type": "token", "content": text}
 
-    # Persisti la classificazione prodotta dal triage. .value estrae la stringa dall'Enum.
-    db.update_incident_classification(
-        incident_id, triage.title, triage.severity.value
-    )
-    # Un evento di timeline per ogni team coinvolto (tracciabilità).
+    db.update_incident_classification(incident_id, triage.title, triage.severity.value)
     for team_id in triage.suggested_teams:
         db.add_timeline_event(incident_id, "involvement", "triage", team_id)
     db.add_timeline_event(incident_id, "triage", "triage", text)
 
-    # Restituiamo il nome della transizione: classificato OK vs servono dettagli.
-    return "TRIAGE_NEEDS_CLARIFICATION" if triage.needs_clarification else "TRIAGE_CLASSIFIED"
+    if triage.needs_clarification:
+        return "TRIAGE_NEEDS_CLARIFICATION", triage
+    return "TRIAGE_CLASSIFIED", triage
 
 
-def _stream_investigator(incident_id: str, message: str, description: str):
-    """Investigator: prosa, token streaming reale. Non cambia lo stato."""
+def _stream_investigator(incident_id: str, message: str, description: str,
+                         triage_context: str = "", conversation_context: str = ""):
+    """Investigator: token streaming. Restituisce il testo completo per il resolver."""
     agent = create_investigator_agent()
-    prompt = build_investigation_prompt(message, description)
-    # yield from: inoltra tutti gli eventi token/tool E cattura il testo completo
-    # accumulato (quello che _stream_agent_prose restituisce con `return full`).
-    full = yield from _stream_agent_prose(agent, prompt)
+    incident_context = description
+    if conversation_context:
+        incident_context += f"\n\n<conversation_history>\n{conversation_context}\n</conversation_history>"
+    prompt = build_investigation_prompt(message, incident_context, triage_context=triage_context)
+    full, _ = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "message", "investigator", full)
-    return None   # l'indagine non fa avanzare lo stato dell'incidente
+    return full  # passato al resolver nella pipeline automatica
 
 
-def _stream_resolver(incident_id: str, message: str, description: str):
-    """Resolver: prosa, token streaming reale. Garantisce lo stato 'active'."""
+def _stream_resolver(incident_id: str, message: str, description: str,
+                     triage_context: str = "", investigation_summary: str = "",
+                     conversation_context: str = ""):
+    """Resolver: token streaming. Garantisce lo stato 'active'."""
     agent = create_resolver_agent()
-    prompt = build_resolution_prompt(description, f"User request: {message}")
-    full = yield from _stream_agent_prose(agent, prompt)
+    additional_parts = []
+    if triage_context:
+        additional_parts.append(f"Classification context:\n{triage_context}")
+    if message:
+        additional_parts.append(f"User request: {message}")
+    if conversation_context:
+        additional_parts.append(f"Conversation history:\n{conversation_context}")
+    additional = "\n\n".join(additional_parts)
+    prompt = build_resolution_prompt(description, additional_context=additional,
+                                     investigation_summary=investigation_summary)
+    full, has_evidence = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "resolution", "resolver", full)
-    return "RESOLUTION_STARTED"   # proporre una soluzione assicura lo stato 'active'
+    if not has_evidence:
+        reason = "Nessuna fonte applicabile trovata: è richiesto il contributo di una persona esperta."
+        db.add_timeline_event(incident_id, "escalation", "resolver", reason)
+        yield {
+            "type": "human_help_required",
+            "data": {"problem_context": description, "reason": reason},
+        }
+    return "RESOLUTION_STARTED"
+
+
+def _stream_override(decision: RoutingDecision):
+    """Propone un override strutturato senza applicarlo: aspetta conferma dal frontend.
+    Valida team e severità rispetto al catalogo; emette override_proposed se valido."""
+    params = decision.override_params
+    if params is None:
+        yield {"type": "token", "content": "Non riesco a capire cosa vuoi modificare. Specifica severità (es. 'alza a SEV1') o team (es. 'coinvolgi PRODUCTION')."}
+        return
+
+    _, valid_ids = db.get_teams()
+    add_teams = [t for t in params.add_teams if t in valid_ids]
+    remove_teams = [t for t in params.remove_teams if t in valid_ids]
+    severity_val = params.severity.value if params.severity else None
+
+    if severity_val is None and not add_teams and not remove_teams:
+        yield {
+            "type": "token",
+            "content": f"Nessuna modifica valida riconosciuta. Team disponibili: {', '.join(sorted(valid_ids))}",
+        }
+        return
+
+    yield {
+        "type": "override_proposed",
+        "data": {
+            "severity": severity_val,
+            "add_teams": add_teams,
+            "remove_teams": remove_teams,
+            "description": params.description or decision.reason,
+        },
+    }
+
+
+def _format_triage_context(triage: TriageOutput) -> str:
+    teams = ", ".join(triage.suggested_teams) if triage.suggested_teams else "nessuno"
+    return (
+        f"Titolo: {triage.title}\n"
+        f"Severità: {triage.severity.value}\n"
+        f"Team suggeriti: {teams}\n"
+        f"Sommario: {triage.summary}"
+    )
+
+
+def _conversation_context(incident_id: str, limit: int = 12) -> str:
+    """Formatta gli ultimi eventi conversazionali per riprendere una sessione."""
+    relevant_types = {"message", "triage", "resolution", "override"}
+    events = [
+        event for event in db.get_timeline(incident_id)
+        if event["event_type"] in relevant_types and event.get("content")
+    ][-limit:]
+    return "\n".join(
+        f"{event.get('actor') or 'system'}: {event['content']}"
+        for event in events
+    )
 
 
 def _stream_agent_prose(agent, prompt: str):
@@ -218,17 +309,30 @@ def _stream_agent_prose(agent, prompt: str):
     (e i tool call come eventi 'tool', opzionali per la UX). Restituisce il testo
     completo accumulato, da persistere in timeline."""
     full = ""   # qui accumuliamo l'intera risposta pezzo per pezzo
+    tool_calls = 0
+    useful_tool_results = 0
     try:
         # Con stream=True, agent.run NON restituisce un valore unico ma è ITERABILE:
         # produce una sequenza di eventi via via che il modello genera. Il for li
         # consuma uno a uno.
         for ev in agent.run(prompt, stream=True, stream_events=True):
             if isinstance(ev, ToolCallStartedEvent):
+                tool_calls += 1
                 # L'agente sta chiamando un tool di ricerca. getattr(obj, "attr",
                 # default) legge un attributo in modo sicuro (default se assente).
                 name = getattr(ev.tool, "tool_name", None) if ev.tool else None
                 if name:
                     yield {"type": "tool", "name": name}   # la UI può mostrare "🔍 sto cercando..."
+            elif isinstance(ev, ToolCallCompletedEvent):
+                tool_result = ev.tool.result if ev.tool else None
+                content = str(ev.content or tool_result or "").lower()
+                no_result_markers = (
+                    "no similar past incidents found",
+                    "no relevant knowledge base articles found",
+                    "no verified human solutions found",
+                )
+                if content and not any(marker in content for marker in no_result_markers):
+                    useful_tool_results += 1
             elif isinstance(ev, RunContentEvent):
                 # Un "delta" di testo (qualche parola). Lo accumuliamo e lo inoltriamo.
                 if ev.content:
@@ -246,7 +350,7 @@ def _stream_agent_prose(agent, prompt: str):
         full += err
         yield {"type": "token", "content": err}
     # Il valore di `return` di un generatore viene raccolto da chi fa `yield from`.
-    return full
+    return full, tool_calls > 0 and useful_tool_results > 0
 
 
 # ---------------------------------------------------------------------------
@@ -261,31 +365,81 @@ def create_incident(description: str, created_by: str) -> dict:
     return db.create_incident(description, created_by)
 
 
-def list_incidents(status: str | None = None, limit: int = 100) -> list[dict]:
-    return db.list_incidents(status=status, limit=limit)
+def list_incidents(user_id: str, status: str | None = None, limit: int = 100) -> list[dict]:
+    """Elenca le conversazioni dell'utente e gli incidenti seed pubblici."""
+    return db.list_user_incidents(user_id, status=status, limit=limit)
+
+
+def join_incident(incident_id: str, user_id: str) -> None:
+    """Associa un utente autenticato a una conversazione esistente."""
+    if db.get_incident(incident_id) is None:
+        raise ValueError(f"Incident {incident_id} not found")
+    db.add_incident_participant(incident_id, user_id)
 
 
 def get_incident_detail(incident_id: str) -> dict | None:
-    """Incidente completo: campi + timeline + remediation + post-mortem."""
+    """Incidente completo: campi + timeline + remediation + post-mortem + team correnti."""
     incident = db.get_incident(incident_id)
     if incident is None:
         return None
-    # `**incident` "spacchetta" tutte le chiavi dell'incidente dentro questo nuovo
-    # dict, a cui aggiungiamo le tre liste correlate. È un modo compatto per dire
-    # "tutti i campi dell'incidente, più questi altri tre".
     return {
         **incident,
+        "involved_teams": db.get_incident_teams(incident_id),
         "timeline": db.get_timeline(incident_id),
-        "remediation": db.get_remediation(incident_id),
         "post_mortem": db.get_post_mortem(incident_id),
+        "participants": db.get_incident_participants(incident_id),
     }
 
 
-def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str,
-                    verified_solution: str | None = None) -> dict:
+def override_classification(
+    incident_id: str,
+    override: ClassificationOverrideRequest,
+    actor: str,
+) -> dict:
+    """Applica un override umano su severità e/o team. Loga l'azione in timeline.
+
+    Valida team rispetto al catalogo (filtra silenziosamente quelli non validi).
+    Solleva ValueError se l'incidente non esiste.
+    """
+    incident = db.get_incident(incident_id)
+    if incident is None:
+        raise ValueError(f"Incident {incident_id} not found")
+
+    _, valid_ids = db.get_teams()
+
+    before_sev = incident.get("severity")
+    before_teams = db.get_incident_teams(incident_id)
+
+    if override.severity is not None:
+        db.update_incident_severity(incident_id, override.severity.value)
+
+    add_teams = [t for t in override.add_teams if t in valid_ids]
+    remove_teams = [t for t in override.remove_teams if t in valid_ids]
+    for team_id in add_teams:
+        db.add_timeline_event(incident_id, "involvement", actor, team_id)
+    for team_id in remove_teams:
+        db.add_timeline_event(incident_id, "disinvolvement", actor, team_id)
+
+    log = json.dumps({
+        "before": {"severity": before_sev, "teams": before_teams},
+        "after": {
+            "severity": override.severity.value if override.severity else before_sev,
+            "add_teams": add_teams,
+            "remove_teams": remove_teams,
+        },
+        "reason": override.reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }, ensure_ascii=False)
+    db.add_timeline_event(incident_id, "override", actor, log)
+
+    updated = db.get_incident(incident_id)
+    assert updated is not None
+    return updated
+
+
+def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str) -> dict:
     """Chiude un incidente (azione esplicita). Genera il post-mortem e lancia il
-    loop di apprendimento: re-indicizza l'incidente risolto e, se è stata fornita
-    una soluzione umana, la indicizza come fonte verificata ad alta priorità.
+    loop di apprendimento re-indicizzando l'incidente risolto.
 
     Solleva ValueError se la transizione RESOLVED non è consentita dallo stato.
     """
@@ -311,12 +465,12 @@ def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str
 
     # Loop di apprendimento: re-indicizziamo l'incidente risolto in LanceDB (append)
     # così diventa subito ricercabile dagli agenti per i casi futuri.
-    _index_resolved_incident(incident, resolution_summary)
-    # Se è stata fornita anche una soluzione umana, la indicizziamo come fonte
-    # verificata ad alta priorità.
-    if verified_solution:
-        _index_verified_solution(incident_id, incident, verified_solution, provided_by)
-
+    try:
+        _index_resolved_incident(incident, resolution_summary)
+    except Exception:
+        # SQLite e' la sorgente di verita': un guasto del vector DB non deve
+        # annullare una chiusura gia' persistita correttamente.
+        logger.exception("Failed to index resolved incident %s", incident_id)
     # Rileggiamo l'incidente aggiornato. get_incident è tipato "dict | None", ma qui
     # esiste di sicuro (l'abbiamo appena modificato): l'assert lo comunica al
     # type-checker, "restringendo" il tipo a dict.
@@ -395,13 +549,7 @@ def _build_post_mortem(incident: dict, resolution_summary: str) -> dict:
         title=incident["title"],
         severity=severity,
         timeline=timeline,
-        impact="",
-        detection="",
-        root_cause="",
-        # `[x] if x else []` → lista con un elemento se c'è un riepilogo, altrimenti vuota.
-        resolution_steps=[resolution_summary] if resolution_summary else [],
-        action_items=[],
-        references=[],
+        resolution=resolution_summary,
     )
     # Restituiamo un dict JSON-compatibile (così il chiamante può serializzarlo).
     return pm.model_dump(mode="json")
@@ -415,25 +563,41 @@ def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
         "title": incident["title"],
         "severity": incident.get("severity") or "",
         "description": incident["description"],
-        "root_cause": "",
-        "resolution_steps": [resolution_summary] if resolution_summary else [],
+        "resolution": resolution_summary,
     }
     # Costruiamo il testo, lo embeddiamo e lo appendiamo a 'past_incidents'.
     vector = embed_text(_build_incident_text(inc_for_index))
     add_past_incident(get_db(), inc_for_index, vector)
 
 
-def _index_verified_solution(incident_id: str, incident: dict, solution_text: str,
-                            provided_by: str) -> None:
-    """Indicizza una soluzione fornita da un umano come fonte verificata.
-    L'id `VS-<incident_id>` è univoco per incidente e tracciabile."""
-    solution = {
-        "id": f"VS-{incident_id}",          # id univoco e tracciabile (VS = Verified Solution)
-        "incident_id": incident_id,
-        "problem_context": incident["description"],
-        "solution": solution_text,
-        "provided_by": provided_by,
-    }
-    # Embeddiamo contesto + soluzione insieme e la appendiamo a 'verified_solutions'.
+def capture_verified_solution(incident_id: str, solution_text: str,
+                              provided_by: str) -> dict:
+    """Salva una soluzione umana e prova a renderla subito recuperabile dal RAG."""
+    incident = db.get_incident(incident_id)
+    if incident is None:
+        raise ValueError(f"Incident {incident_id} not found")
+    solution = VerifiedSolution(
+        id=f"VS-{incident_id}-{uuid.uuid4().hex[:8]}",
+        incident_id=incident_id,
+        problem_context=incident["description"],
+        solution=solution_text,
+        provided_by=provided_by,
+    ).model_dump(mode="json")
+    saved = db.save_verified_solution(solution)
+    db.add_timeline_event(
+        incident_id,
+        "human_solution",
+        provided_by,
+        f"Soluzione verificata acquisita: {solution_text}",
+    )
+    try:
+        _index_verified_solution(solution)
+    except Exception:
+        logger.exception("Failed to index verified solution %s", solution["id"])
+    return saved
+
+
+def _index_verified_solution(solution: dict) -> None:
+    """Indicizza in LanceDB una soluzione umana già persistita in SQLite."""
     text = solution["problem_context"] + " " + solution["solution"]
     add_verified_solution(get_db(), solution, embed_text(text))
