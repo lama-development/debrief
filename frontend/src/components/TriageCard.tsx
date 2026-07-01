@@ -5,7 +5,6 @@ import type { TriageData } from "@/lib/types"
 
 export function TriageCard({ data }: { data: TriageData }) {
   const confidence = Math.round(data.confidence * 100)
-  const hasDetails = data.affected_systems.length > 0 || data.suggested_teams.length > 0
 
   return (
     <div className="rounded-lg border bg-card p-3 text-sm">
@@ -19,28 +18,16 @@ export function TriageCard({ data }: { data: TriageData }) {
         <span className="text-muted-foreground">{confidence}% confidenza</span>
       </div>
 
-      {hasDetails && (
-        <div className="mt-2.5 space-y-2 border-t pt-2.5">
-          {data.affected_systems.length > 0 && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground pt-0.5">Sistemi</span>
-              <div className="flex flex-wrap gap-1">
-                {data.affected_systems.map((s) => (
-                  <span key={s} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{s}</span>
-                ))}
-              </div>
+      {data.suggested_teams.length > 0 && (
+        <div className="mt-2.5 border-t pt-2.5">
+          <div className="flex items-start gap-2">
+            <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground pt-0.5">Team</span>
+            <div className="flex flex-wrap gap-1">
+              {data.suggested_teams.map((t) => (
+                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{t}</span>
+              ))}
             </div>
-          )}
-          {data.suggested_teams.length > 0 && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground pt-0.5">Team</span>
-              <div className="flex flex-wrap gap-1">
-                {data.suggested_teams.map((t) => (
-                  <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{t}</span>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>

@@ -2,8 +2,8 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Flag,
+  Pencil,
   ShieldAlert,
-  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react"
@@ -28,6 +28,14 @@ interface Milestone {
 // qui resta la cronologia "ufficiale" dei fatti con data e ora.
 function toMilestones(events: TimelineEvent[]): Milestone[] {
   const out: Milestone[] = []
+
+  // Team assegnati dal triage: aggregati in un'unica riga invece di N milestone separati.
+  const triageTeams = events
+    .filter((ev) => ev.event_type === "involvement" && ev.actor === "triage")
+    .map((ev) => ev.content ?? "")
+    .filter(Boolean)
+    .join(", ")
+
   events.forEach((ev, idx) => {
     // Il primo evento in assoluto è il messaggio di dichiarazione dell'incidente.
     if (idx === 0) {
@@ -46,20 +54,40 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           key: `${ev.id}`,
           time: ev.timestamp,
           label: "Classificato dal triage",
+          detail: triageTeams || undefined,
           icon: ClipboardCheck,
           cls: AGENT_IDENTITY.triage.timelineCls,
         })
         break
+      // involvement e disinvolvement individuali: il triage li aggrega sopra,
+      // quelli umani sono già riassunti nell'evento "override".
       case "involvement":
+      case "disinvolvement":
+        break
+      case "override": {
+        let detail: string | undefined
+        try {
+          const parsed = JSON.parse(ev.content ?? "")
+          const parts: string[] = []
+          if (parsed.after?.severity && parsed.after.severity !== parsed.before?.severity)
+            parts.push(`Severità → ${parsed.after.severity}`)
+          if (parsed.after?.add_teams?.length) parts.push(`+${parsed.after.add_teams.join(", ")}`)
+          if (parsed.after?.remove_teams?.length) parts.push(`-${parsed.after.remove_teams.join(", ")}`)
+          if (parsed.reason) parts.push(`motivo: ${parsed.reason}`)
+          detail = parts.join(" · ") || undefined
+        } catch {
+          detail = undefined
+        }
         out.push({
           key: `${ev.id}`,
           time: ev.timestamp,
-          label: "Team coinvolto",
-          detail: ev.content ?? undefined,
-          icon: Users,
-          cls: AGENT_IDENTITY.triage.timelineCls,
+          label: `Classificazione modificata da ${ev.actor ?? "utente"}`,
+          detail,
+          icon: Pencil,
+          cls: DECLARED_CLS,
         })
         break
+      }
       case "escalation":
         out.push({
           key: `${ev.id}`,

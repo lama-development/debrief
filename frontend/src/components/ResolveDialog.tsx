@@ -16,26 +16,20 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-// Dialog di chiusura incidente: riepilogo risoluzione (obbligatorio) + eventuale
-// soluzione verificata (alimenta il learning loop come fonte ad alta priorità).
+// Dialog di chiusura incidente: richiede soltanto il riepilogo della risoluzione.
 export function ResolveDialog({ incidentId }: { incidentId: string }) {
   const [open, setOpen] = useState(false)
   const [summary, setSummary] = useState("")
-  const [verified, setVerified] = useState("")
   const resolve = useResolveIncident(incidentId)
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!summary.trim()) return
     try {
-      await resolve.mutateAsync({
-        resolution_summary: summary.trim(),
-        verified_solution: verified.trim() || undefined,
-      })
+      await resolve.mutateAsync({ resolution_summary: summary.trim() })
       toast.success("Incidente risolto")
       setOpen(false)
       setSummary("")
-      setVerified("")
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Risoluzione fallita")
     }
@@ -50,8 +44,7 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
         <DialogHeader className="space-y-3">
           <DialogTitle className="text-xl">Risolvi incidente</DialogTitle>
           <DialogDescription className="leading-5">
-            Riepiloga come è stato risolto. La soluzione verificata (opzionale) verrà
-            indicizzata come fonte ad alta priorità per incidenti futuri simili.
+            Riepiloga come è stato risolto l'incidente.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -66,17 +59,6 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
               className="bg-background"
               autoFocus
               required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="verified">Soluzione verificata (opzionale)</Label>
-            <Textarea
-              id="verified"
-              value={verified}
-              onChange={(e) => setVerified(e.target.value)}
-              placeholder="Procedura riutilizzabile da archiviare come soluzione verificata…"
-              rows={3}
-              className="bg-background"
             />
           </div>
           <DialogFooter>

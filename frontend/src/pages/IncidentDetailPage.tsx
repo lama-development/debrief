@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ChevronDown, Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppHeader } from "@/components/AppHeader"
@@ -14,9 +14,86 @@ import { Timeline } from "@/components/Timeline"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels"
 import { useIncident, useReopenIncident } from "@/hooks/useIncident"
+import { useUpdateClassification } from "@/hooks/useUpdateClassification"
 import { ApiError } from "@/lib/api"
-import type { IncidentStatus, PostMortem } from "@/lib/types"
+import type { IncidentStatus, PostMortem, Severity } from "@/lib/types"
+
+const ALL_SEVERITIES: Severity[] = ["SEV1", "SEV2", "SEV3", "SEV4"]
+
+function SeverityDropdown({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: Severity
+  disabled: boolean
+  onChange: (s: Severity) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [open])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Cambia severità"
+        title={SEVERITY_TOOLTIP[value]}
+        className={cn(
+          "inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-sm font-semibold shadow-sm disabled:opacity-50",
+          SEVERITY_CLASS[value],
+        )}
+      >
+        {value}
+        <ChevronDown className="h-3 w-3 opacity-70" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[80px] rounded-md border bg-background p-1 shadow-md">
+          {ALL_SEVERITIES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={disabled}
+              onClick={() => { onChange(s); setOpen(false) }}
+              title={SEVERITY_TOOLTIP[s]}
+              className={cn(
+                "w-full rounded px-2 py-1.5 text-left text-sm disabled:opacity-50",
+                s === value ? "font-semibold text-foreground" : "hover:bg-muted",
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Team catalog mirrored from seed/teams.json — IDs stabili, non cambiano a runtime.
+const ALL_TEAMS: { id: string; label: string }[] = [
+  { id: "IT_INTERNAL", label: "IT Interno" },
+  { id: "IT_DEV", label: "Sviluppatori Genius" },
+  { id: "IT_EXTERNAL", label: "2000net Srl" },
+  { id: "PLC_VENDOR", label: "Fornitore PLC" },
+  { id: "PRODUCTION", label: "Reparto Produzione" },
+  { id: "LAB", label: "Laboratorio" },
+  { id: "MANAGEMENT", label: "Direzione" },
+]
 
 const RESOLVABLE: IncidentStatus[] = ["open", "active"]
 
@@ -25,7 +102,21 @@ export function IncidentDetailPage() {
   const qc = useQueryClient()
   const { data: incident, isLoading, isError } = useIncident(id)
   const reopen = useReopenIncident(id)
+  const updateClass = useUpdateClassification(id)
   const [mobileTab, setMobileTab] = useState<"chat" | "details">("chat")
+  const [showTeamPicker, setShowTeamPicker] = useState(false)
+  const teamPickerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showTeamPicker) return
+    function onPointerDown(e: PointerEvent) {
+      if (teamPickerRef.current && !teamPickerRef.current.contains(e.target as Node)) {
+        setShowTeamPicker(false)
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    return () => document.removeEventListener("pointerdown", onPointerDown)
+  }, [showTeamPicker])
 
   if (isLoading) {
     return (
@@ -56,13 +147,42 @@ export function IncidentDetailPage() {
 
   const canResolve = RESOLVABLE.includes(incident.status)
   const isResolved = incident.status === "resolved"
+  const canOverride = !isResolved
+  const currentSeverity = incident.severity
+
+  async function onSeverityChange(newSev: Severity) {
+    if (newSev === currentSeverity) return
+    try {
+      await updateClass.mutateAsync({ severity: newSev })
+      toast.success(`Severità aggiornata a ${newSev}`)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito")
+    }
+  }
+
+  async function onAddTeam(teamId: string) {
+    try {
+      await updateClass.mutateAsync({ add_teams: [teamId] })
+      setShowTeamPicker(false)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito")
+    }
+  }
+
+  async function onRemoveTeam(teamId: string) {
+    try {
+      await updateClass.mutateAsync({ remove_teams: [teamId] })
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Rimozione fallita")
+    }
+  }
 
   return (
     <div className="flex h-svh flex-col bg-muted/30">
       <AppHeader />
 
       {/* Intestazione incidente */}
-      <div className="container pt-4">
+      <div className="container pt-4 relative z-20">
         <Card className="px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
             <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Torna alla dashboard">
@@ -75,7 +195,15 @@ export function IncidentDetailPage() {
               <div className="flex items-center justify-between gap-2 mt-1.5">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={incident.status} />
-                  <SeverityBadge severity={incident.severity} />
+                  {canOverride && incident.severity ? (
+                    <SeverityDropdown
+                      value={incident.severity}
+                      disabled={updateClass.isPending}
+                      onChange={(s) => void onSeverityChange(s)}
+                    />
+                  ) : (
+                    <SeverityBadge severity={incident.severity} />
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 sm:hidden">
                   {canResolve && <ResolveDialog incidentId={incident.id} />}
@@ -126,7 +254,7 @@ export function IncidentDetailPage() {
         </div>
 
         <div className="min-h-0 flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-          {/* Sinistra: descrizione, timeline, remediation, post-mortem */}
+          {/* Sinistra: descrizione, timeline e post-mortem */}
           <div className={cn("min-h-0 space-y-4 overflow-y-auto pr-1", mobileTab !== "details" && "hidden lg:block")}>
             <Card>
               <CardHeader className="pb-2">
@@ -137,28 +265,90 @@ export function IncidentDetailPage() {
               </CardContent>
             </Card>
 
-            {incident.post_mortem && <PostMortemCard pm={incident.post_mortem} />}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Partecipanti</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1.5">
+                  {incident.participants.map((participant) => (
+                    <span
+                      key={participant.id}
+                      className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                    >
+                      {participant.username}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-            {incident.remediation.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Remediation</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm">
-                    {incident.remediation.map((step) => (
-                      <li key={step.id} className="flex items-start gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                        <div>
-                          <span>{step.description}</span>
-                          <span className="ml-2 text-sm text-muted-foreground">[{step.source}]</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
+            {/* Card team coinvolti — visibile sempre, modificabile se non risolto */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Team coinvolti</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1.5">
+                  {incident.involved_teams.map((teamId) => {
+                    const label = ALL_TEAMS.find((t) => t.id === teamId)?.label ?? teamId
+                    return (
+                      <span
+                        key={teamId}
+                        className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                      >
+                        {label}
+                        {canOverride && (
+                          <button
+                            type="button"
+                            onClick={() => void onRemoveTeam(teamId)}
+                            disabled={updateClass.isPending}
+                            aria-label={`Rimuovi ${label}`}
+                            className="ml-0.5 rounded-full hover:text-destructive disabled:opacity-50"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </span>
+                    )
+                  })}
+
+                  {canOverride && (
+                    <div ref={teamPickerRef} className="contents">
+                      {!showTeamPicker ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowTeamPicker(true)}
+                          className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Aggiungi
+                        </button>
+                      ) : (
+                        ALL_TEAMS.filter((t) => !incident.involved_teams.includes(t.id)).map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => void onAddTeam(t.id)}
+                            disabled={updateClass.isPending}
+                            className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50"
+                          >
+                            <Plus className="h-3 w-3" />
+                            {t.label}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {incident.involved_teams.length === 0 && !canOverride && (
+                    <p className="text-xs text-muted-foreground">Nessun team coinvolto.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {incident.post_mortem && <PostMortemCard pm={incident.post_mortem} />}
 
             <Card>
               <CardHeader className="pb-2">
@@ -180,6 +370,7 @@ export function IncidentDetailPage() {
                 initialEvents={incident.timeline}
                 initialDraft={incident.status === "open" ? incident.description : ""}
                 onTurnComplete={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
+                onClassificationChanged={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
               />
             </CardContent>
           </Card>
@@ -196,29 +387,7 @@ function PostMortemCard({ pm }: { pm: PostMortem }) {
         <CardTitle className="text-base">Post-mortem</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {pm.root_cause && <Field label="Causa radice" value={pm.root_cause} />}
-        {pm.impact && <Field label="Impatto" value={pm.impact} />}
-        {pm.detection && <Field label="Rilevamento" value={pm.detection} />}
-        {pm.resolution_steps && pm.resolution_steps.length > 0 && (
-          <div>
-            <div className="mb-1 text-sm font-medium text-muted-foreground">Passi di risoluzione</div>
-            <ul className="list-inside list-disc space-y-1">
-              {pm.resolution_steps.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {pm.action_items && pm.action_items.length > 0 && (
-          <div>
-            <div className="mb-1 text-sm font-medium text-muted-foreground">Action item</div>
-            <ul className="list-inside list-disc space-y-1">
-              {pm.action_items.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {pm.resolution && <Field label="Risoluzione" value={pm.resolution} />}
       </CardContent>
     </Card>
   )

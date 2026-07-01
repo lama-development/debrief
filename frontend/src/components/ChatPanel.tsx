@@ -4,14 +4,15 @@ import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+import { OverrideConfirmCard } from "@/components/OverrideConfirmCard"
 import { TriageCard } from "@/components/TriageCard"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { streamChat } from "@/lib/chat"
-import { ApiError } from "@/lib/api"
+import { incidentsApi, ApiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { getAgentIdentity } from "@/lib/agents"
-import type { ChatEvent, IncidentStatus, TimelineEvent, TriageData } from "@/lib/types"
+import type { ChatEvent, HumanHelpRequest, IncidentStatus, OverrideProposal, TimelineEvent, TriageData } from "@/lib/types"
 
 interface ChatMessage {
   id: number
@@ -19,6 +20,9 @@ interface ChatMessage {
   agent?: string
   content: string
   triage?: TriageData
+  overrideProposal?: OverrideProposal
+  humanHelp?: HumanHelpRequest
+  overrideDismissed?: boolean
 }
 
 const ASSISTANT_ACTORS = new Set(["triage", "investigator", "resolver"])
@@ -32,7 +36,9 @@ function seedMessages(events: TimelineEvent[]): ChatMessage[] {
     // nella card "Descrizione" e nel milestone "Incidente dichiarato", quindi non
     // la ripetiamo come bolla di chat.
     if (idx === 0) return
-    if (ev.event_type === "involvement") return // mostrato nella timeline a sinistra
+    if (ev.event_type === "involvement") return   // mostrato nella timeline a sinistra
+    if (ev.event_type === "disinvolvement") return
+    if (ev.event_type === "override") return
     const isAssistant = ASSISTANT_ACTORS.has(ev.actor ?? "")
     out.push({
       id: ev.id,
@@ -50,22 +56,29 @@ export function ChatPanel({
   initialEvents,
   initialDraft = "",
   onTurnComplete,
+  onClassificationChanged,
 }: {
   incidentId: string
   status: IncidentStatus
   initialEvents: TimelineEvent[]
   initialDraft?: string
   onTurnComplete: () => void
+  onClassificationChanged?: () => void
 }) {
   // Seed una volta sola al mount (il parent passa key={incidentId} -> remount per incidente).
   const [messages, setMessages] = useState<ChatMessage[]>(() => seedMessages(initialEvents))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
+  const [activeAgent, setActiveAgent] = useState<string | null>(null)
+  const [overridePending, setOverridePending] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const nextLocalId = useRef(-1) // id negativi per i messaggi creati lato client
   const autoSent = useRef(false)
+  // Traccia il messaggio assistente attualmente in costruzione: aggiornato da
+  // ogni evento "phase" così i token successivi vanno nella bolla giusta.
+  const activeAssistantId = useRef(-1)
 
   const closed = CLOSED_STATUSES.includes(status)
 
@@ -98,27 +111,30 @@ export function ChatPanel({
     if (!text || streaming) return
 
     const userMsg: ChatMessage = { id: nextLocalId.current--, role: "user", content: text }
-    // Messaggio assistente "in costruzione" che riempiremo coi token in streaming.
     const assistantId = nextLocalId.current--
+    activeAssistantId.current = assistantId
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }])
     if (textArg === undefined) setInput("")
     setStreaming(true)
     setActiveTool(null)
+    setActiveAgent(null)
 
-    // Aggiorna il messaggio assistente corrente in modo immutabile.
+    // Legge sempre activeAssistantId.current: si aggiorna automaticamente quando
+    // arriva un evento "phase" che crea una nuova bolla per l'agente successivo.
     const patchAssistant = (patch: Partial<ChatMessage>) =>
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, ...patch, content: patch.content ?? m.content } : m)),
+        prev.map((m) => (m.id === activeAssistantId.current ? { ...m, ...patch, content: patch.content ?? m.content } : m)),
       )
     const appendToken = (token: string) =>
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
+        prev.map((m) => (m.id === activeAssistantId.current ? { ...m, content: m.content + token } : m)),
       )
 
     const onEvent = (ev: ChatEvent) => {
       switch (ev.type) {
         case "routing":
           patchAssistant({ agent: ev.agent })
+          setActiveAgent(ev.agent)
           break
         case "tool":
           setActiveTool(ev.name)
@@ -126,11 +142,26 @@ export function ChatPanel({
         case "triage":
           patchAssistant({ agent: "triage", triage: ev.data })
           break
+        case "override_proposed":
+          patchAssistant({ agent: "override", overrideProposal: ev.data })
+          break
+        case "human_help_required":
+          patchAssistant({ agent: "resolver", humanHelp: ev.data })
+          break
+        case "phase": {
+          const newId = nextLocalId.current--
+          activeAssistantId.current = newId
+          setActiveTool(null)
+          setActiveAgent(ev.agent)
+          setMessages((prev) => [...prev, { id: newId, role: "assistant", content: "", agent: ev.agent }])
+          break
+        }
         case "token":
           appendToken(ev.content)
           break
         case "done":
           setActiveTool(null)
+          setActiveAgent(null)
           onTurnComplete()
           break
         case "error":
@@ -148,6 +179,28 @@ export function ChatPanel({
     } finally {
       setStreaming(false)
       setActiveTool(null)
+      setActiveAgent(null)
+    }
+  }
+
+  async function handleOverrideConfirm(msgId: number) {
+    const msg = messages.find((m) => m.id === msgId)
+    if (!msg?.overrideProposal) return
+    const { severity, add_teams, remove_teams } = msg.overrideProposal
+    setOverridePending(true)
+    try {
+      await incidentsApi.patchClassification(incidentId, {
+        severity: severity ?? undefined,
+        add_teams,
+        remove_teams,
+      })
+      setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, overrideDismissed: true } : m))
+      toast.success("Classificazione aggiornata")
+      onClassificationChanged?.()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito")
+    } finally {
+      setOverridePending(false)
     }
   }
 
@@ -161,13 +214,15 @@ export function ChatPanel({
           </p>
         )}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            incidentId={incidentId}
+            onOverrideConfirm={handleOverrideConfirm}
+            overridePending={overridePending}
+          />
         ))}
-        {activeTool && (
-          <div className="flex items-center gap-2 pl-10 text-sm text-muted-foreground">
-            <Search className="h-3.5 w-3.5 animate-pulse" /> ricerca in corso ({activeTool})…
-          </div>
-        )}
+        {activeTool && <ToolBubble agent={activeAgent} />}
       </div>
 
       {/* Input floating */}
@@ -204,7 +259,33 @@ export function ChatPanel({
   )
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function ToolBubble({ agent }: { agent: string | null }) {
+  const identity = getAgentIdentity(agent ?? undefined)
+  return (
+    <div className="flex gap-2">
+      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", identity.iconCls)}>
+        <Bot className="h-4 w-4" />
+      </span>
+      <div className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm", identity.bubbleCls)}>
+        <Search className="h-3.5 w-3.5 animate-pulse" />
+        <span className="text-muted-foreground">Ricerca in corso…</span>
+      </div>
+    </div>
+  )
+}
+
+function MessageBubble({
+  message,
+  incidentId,
+  onOverrideConfirm,
+  overridePending,
+}: {
+  message: ChatMessage
+  incidentId: string
+  onOverrideConfirm: (msgId: number) => void
+  overridePending: boolean
+}) {
+  const [dismissed, setDismissed] = useState(message.overrideDismissed ?? false)
   const isUser = message.role === "user"
   const identity = getAgentIdentity(message.agent)
   return (
@@ -218,12 +299,23 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </span>
       <div className={cn("max-w-[80%] space-y-2", isUser ? "items-end" : "items-start")}>
-        {!isUser && message.agent && (
+        {!isUser && message.agent && message.agent !== "override" && (
           <div className="text-sm font-medium text-muted-foreground">
             {identity.label}
           </div>
         )}
         {message.triage && <TriageCard data={message.triage} />}
+        {message.overrideProposal && !dismissed && (
+          <OverrideConfirmCard
+            proposal={message.overrideProposal}
+            isPending={overridePending}
+            onConfirm={() => onOverrideConfirm(message.id)}
+            onCancel={() => setDismissed(true)}
+          />
+        )}
+        {message.humanHelp && (
+          <HumanHelpCard incidentId={incidentId} request={message.humanHelp} />
+        )}
         {message.content && (
           <div
             className={cn(
@@ -245,6 +337,62 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function HumanHelpCard({
+  incidentId,
+  request,
+}: {
+  incidentId: string
+  request: HumanHelpRequest
+}) {
+  const [solution, setSolution] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function submit() {
+    if (solution.trim().length < 3) return
+    setSaving(true)
+    try {
+      await incidentsApi.addVerifiedSolution(incidentId, solution.trim())
+      setSaved(true)
+      toast.success("Soluzione acquisita come conoscenza verificata")
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Salvataggio fallito")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+      <div>
+        <p className="font-medium">È necessario il contributo di una persona</p>
+        <p className="text-muted-foreground">{request.reason}</p>
+      </div>
+      {saved ? (
+        <p className="font-medium text-emerald-700 dark:text-emerald-400">
+          Soluzione salvata e disponibile per problemi futuri simili.
+        </p>
+      ) : (
+        <>
+          <Textarea
+            value={solution}
+            onChange={(event) => setSolution(event.target.value)}
+            placeholder="Descrivi la soluzione verificata dall'esperto…"
+            rows={3}
+          />
+          <Button
+            size="sm"
+            disabled={saving || solution.trim().length < 3}
+            onClick={() => void submit()}
+          >
+            {saving ? "Salvataggio…" : "Capitalizza questa soluzione"}
+          </Button>
+        </>
+      )}
     </div>
   )
 }

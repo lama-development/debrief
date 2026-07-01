@@ -15,7 +15,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => Boolean(getAuthToken()))
 
   // All'avvio: se c'è un token salvato, proviamo a recuperare l'utente (/auth/me).
   // Registriamo anche l'handler di 401 che pulisce lo stato di sessione.
@@ -26,11 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     const token = getAuthToken()
-    if (!token) {
-      setLoading(false)
-      return
-    }
-    authApi
+    if (token) authApi
       .me()
       .then(setUser)
       .catch(() => {
