@@ -322,7 +322,7 @@ def _stream_agent_prose(agent, prompt: str):
                 # default) legge un attributo in modo sicuro (default se assente).
                 name = getattr(ev.tool, "tool_name", None) if ev.tool else None
                 if name:
-                    yield {"type": "tool", "name": name}   # la UI può mostrare "🔍 sto cercando..."
+                    yield {"type": "tool", "name": name}   # la UI può mostrare lo stato di ricerca
             elif isinstance(ev, ToolCallCompletedEvent):
                 tool_result = ev.tool.result if ev.tool else None
                 content = str(ev.content or tool_result or "").lower()

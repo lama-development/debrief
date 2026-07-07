@@ -48,7 +48,9 @@ from debrief.rag.indexer import (
 
 
 def main():
-    print("\n🟣 Starting database seed\n")
+    print("\n================================================")
+    print(" Debrief - Database seed")
+    print("================================================")
 
     # Percorsi (relativi alla root del progetto). os.path.join unisce i pezzi con
     # il separatore giusto del sistema operativo (\ su Windows, / su Linux/Mac).
@@ -59,18 +61,19 @@ def main():
     kb_dir = os.path.join(seed_dir, "knowledge_base")
 
     # --- 1. SQLite ---
-    print("🔵 Setting up SQLite...")
+    print("\n== SQLite ==")
+    print("[INFO] Preparing database")
     conn = get_connection()
     create_tables(conn)              # idempotente: sicuro anche se le tabelle esistono già
     conn.execute("DELETE FROM verified_solutions")
-    print("🟢 Tables created")
+    print("[OK] Tables created")
 
     # Ogni loader restituisce QUANTI record ha caricato: lo stampiamo come riscontro.
     n_teams = load_teams(conn, teams_path)
-    print(f"🟢 {n_teams} teams loaded")
+    print(f"[OK] {n_teams} teams loaded")
 
     n_incidents = load_incidents(conn, incidents_path)
-    print(f"🟢 {n_incidents} incidents loaded")
+    print(f"[OK] {n_incidents} incidents loaded")
 
     with open(solutions_path, encoding="utf-8") as f:
         solutions = json.load(f)
@@ -87,15 +90,15 @@ def main():
         ],
     )
     conn.commit()
-    print(f"🟢 {len(solutions)} verified solutions loaded")
+    print(f"[OK] {len(solutions)} verified solutions loaded")
 
     conn.close()
-    print()
 
     # --- 2. Carica i dati per l'indicizzazione ---
     # Per il RAG ci servono i dati grezzi (gli stessi file JSON), che rileggiamo qui
     # perché ora dobbiamo calcolarne gli embedding, non solo salvarli in SQLite.
-    print("🔵 Preparing data for LanceDB...")
+    print("\n== LanceDB source data ==")
+    print("[INFO] Preparing documents")
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
@@ -121,7 +124,8 @@ def main():
         })
 
     print(
-        f"🟢 {len(incidents)} incidents ({len(rag_incidents)} risolti → RAG), "
+        "[OK] "
+        f"{len(incidents)} incidents ({len(rag_incidents)} risolti -> RAG), "
         f"{len(solutions)} solutions, {len(kb_docs)} runbooks ready"
     )
 
@@ -143,17 +147,17 @@ def main():
                 doc["text"] = doc["text"].replace(placeholder, team_name)  # sostituisci tutte
                 placeholders_resolved += count
 
-    print(f"🟢 {placeholders_resolved} team placeholders resolved in runbooks")
-    print()
+    print(f"[OK] {placeholders_resolved} team placeholders resolved in runbooks")
 
     # --- 3. Calcola gli embedding ---
-    print("🔵 Computing embeddings...")
+    print("\n== Embeddings ==")
 
     # Per ogni tipo costruiamo la lista dei testi DA incorporare. Devono coincidere
     # con il testo usato in fase di ricerca (vedi indexer._build_incident_text).
     incident_texts = [_build_incident_text(inc) for inc in rag_incidents]
     solution_texts = [item["problem_context"] + " " + item["solution"] for item in solutions]
     kb_texts = [doc["text"] for doc in kb_docs]
+    print(f"[INFO] Computing {len(incident_texts) + len(solution_texts) + len(kb_texts)} embeddings")
 
     # Calcola TUTTI gli embedding in un'unica chiamata batch: molto più veloce che
     # farne una per testo. `+` tra liste le concatena in un'unica grande lista.
@@ -168,33 +172,31 @@ def main():
     solution_vectors = all_vectors[idx:idx + len(solutions)]; idx += len(solutions)
     kb_vectors = all_vectors[idx:idx + len(kb_docs)]
 
-    print()
-
     # --- 4. Indicizza in LanceDB ---
-    print("🔵 Indexing into LanceDB...")
+    print("\n== Indexing ==")
+    print("[INFO] Writing LanceDB tables")
     db = get_db()
 
     # Ogni funzione index_* crea/sovrascrive la sua collezione e restituisce il
     # numero di record indicizzati.
     n = index_incidents(db, rag_incidents, incident_vectors)
-    print(f"🟢 {n} incidents indexed in 'past_incidents'")
+    print(f"[OK] {n} incidents indexed in 'past_incidents'")
 
     n = index_verified_solutions(db, solutions, solution_vectors)
-    print(f"🟢 {n} solutions indexed in 'verified_solutions'")
+    print(f"[OK] {n} solutions indexed in 'verified_solutions'")
 
     n = index_knowledge_base(db, kb_docs, kb_vectors)
-    print(f"🟢 {n} runbooks indexed in 'knowledge_base'")
-    print()
+    print(f"[OK] {n} runbooks indexed in 'knowledge_base'")
 
     # --- 5. Test di ricerca ---
     # Verifica di sanità: cerchiamo qualche query di esempio e stampiamo i risultati,
     # così vediamo subito se la ricerca semantica funziona dopo il seed.
-    print("🔵 Semantic search test...")
-    print()
+    print("\n== Semantic search smoke test ==")
 
     # Lista di tuple (query, tabella_in_cui_cercare).
     test_queries = [
-        ("il disco del server è pieno", "past_incidents"),
+        ("TSPlus Remote App disconnette subito dopo il login", "past_incidents"),
+        ("timbratore alimentato ma non raggiungibile sulla VLAN corretta", "past_incidents"),
         ("come gestire un errore del PLC", "knowledge_base"),
     ]
 
@@ -203,7 +205,7 @@ def main():
         query_vec = embed_text(query)
         results = search(db, table, query_vec, k=3, threshold=0.3)
 
-        print(f"🔵 Query: \"{query}\" [{table}]")
+        print(f"[QUERY] \"{query}\" [{table}]")
         if results:
             for r in results:
                 similarity = 1 - r["_distance"] / 2  # distanza L2 -> coseno
@@ -211,12 +213,12 @@ def main():
                 # Prova "title"; se manca usa i primi 60 char di "problem_context"
                 # (le soluzioni verificate non hanno un titolo).
                 title_field = r.get("title", r.get("problem_context", "")[:60])
-                print(f"🟢 {id_field} ({similarity:.2f}) {title_field}")
+                print(f"   [HIT] {id_field} score={similarity:.2f} {title_field}")
         else:
-            print(f"🔴 No results above threshold")
+            print("   [MISS] No results above threshold")
         print()
 
-    print("🟣 Seed complete! The database is ready.")
+    print("[DONE] Seed complete. The database is ready.")
 
 
 # Esegui main() solo se lo script è lanciato direttamente (non se importato).

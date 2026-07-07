@@ -15,12 +15,24 @@
       },
       {
         "id": "TRI-03",
-        "description": "Tre progettisti non riescono ad avviare il CAD perché la licenza è scaduta; gli altri reparti lavorano normalmente.",
+        "description": "L'Access Point AP15-MagazzinoMP risulta offline su UniFi e i tablet del magazzino non riescono a collegarsi alla rete.",
         "expected_severity": "SEV3",
         "expected_needs_clarification": false
       },
       {
         "id": "TRI-04",
+        "description": "Il timbratore del trituratore è alimentato e la porta switch ha link attivo, ma il dispositivo non risponde in rete e mancano timbrature nel gestionale.",
+        "expected_severity": "SEV3",
+        "expected_needs_clarification": false
+      },
+      {
+        "id": "TRI-05",
+        "description": "In TSPlus una finestra modale di Embyon resta fuori dall'area visibile per un solo utente, bloccando l'operazione ma lasciando disponibili gli altri applicativi.",
+        "expected_severity": "SEV3",
+        "expected_needs_clarification": false
+      },
+      {
+        "id": "TRI-06",
         "description": "Non funziona niente, aiuto.",
         "expected_severity": null,
         "expected_needs_clarification": true
@@ -71,12 +83,27 @@
       {
         "id": "RES-01",
         "description": "TSPlus Remote App disconnette tutti subito dopo il login, mentre HTML5 e RDP funzionano.",
-        "expected_any_ids": ["INC-003"]
+        "expected_any_ids": ["INC-003", "VS-003"]
       },
       {
         "id": "RES-02",
         "description": "La configurazione di Microsoft Authenticator è bloccata perché viene richiesto un codice MFA non ancora disponibile.",
-        "expected_any_ids": ["INC-004"]
+        "expected_any_ids": ["INC-004", "VS-004"]
+      },
+      {
+        "id": "RES-03",
+        "description": "Un access point di magazzino è offline su UniFi, non è raggiungibile da remoto e i tablet della zona hanno problemi di connessione.",
+        "expected_any_ids": ["INC-005"]
+      },
+      {
+        "id": "RES-04",
+        "description": "Un timbratore risulta acceso e collegato allo switch, ma non è raggiungibile dalla VLAN corretta e non invia le timbrature al gestionale.",
+        "expected_any_ids": ["INC-006"]
+      },
+      {
+        "id": "RES-05",
+        "description": "In TSPlus una modale di Embyon si apre fuori schermo e blocca la finestra principale per un singolo utente.",
+        "expected_any_ids": ["INC-007"]
       }
     ]
   },
@@ -87,19 +114,19 @@
         "id": "RET-01",
         "cluster": "m365_authentication",
         "query": "Un dipendente non accede a Microsoft 365 per un blocco nella verifica dell'account.",
-        "relevant_ids": ["INC-001", "INC-004", "INC-008"]
+        "relevant_ids": ["INC-001", "INC-004"]
       },
       {
         "id": "RET-02",
         "cluster": "tsplus_remote_session",
         "query": "Un'applicazione pubblicata tramite TSPlus non si apre correttamente nella sessione remota.",
-        "relevant_ids": ["INC-003", "INC-007", "INC-009"]
+        "relevant_ids": ["INC-003", "INC-007"]
       },
       {
         "id": "RET-03",
         "cluster": "unreachable_network_device",
         "query": "Un dispositivo di stabilimento è acceso ma non raggiungibile in rete e causa un disservizio.",
-        "relevant_ids": ["INC-005", "INC-006", "INC-010"]
+        "relevant_ids": ["INC-005", "INC-006"]
       }
     ]
   },

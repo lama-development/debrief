@@ -10,6 +10,10 @@ Tutto avviene in locale, senza usare API, costi aggiuntivi, o rate limit.
 """
 
 import os
+
+# Evita progress bar rumorose negli script CLI (`uv run seed`, `uv run eval`).
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
 import logging
 from sentence_transformers import SentenceTransformer
 
@@ -54,7 +58,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     # Passare TUTTI i testi insieme è molto più veloce che chiamare embed_text in
     # un loop: il modello li elabora in parallelo. Usato dal seed.
     model = get_model()
-    vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=True)
+    vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
     return vectors.tolist()
 
 

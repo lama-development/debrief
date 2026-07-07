@@ -503,7 +503,7 @@ L'harness misura il tempo totale di ogni suite. Token, costo economico e time-to
 
 ### 6.6 L'harness di valutazione
 
-Uno script eseguibile con un solo comando (es. `uv run eval`) che: carica i dataset di test, esegue ciascun agente sui rispettivi casi, calcola le metriche del §6.3–6.5 e produce un report tabellare. Riproducibile da chiunque, è al tempo stesso "valutazione strutturata" e prova di riproducibilità — due requisiti della rubrica soddisfatti dallo stesso artefatto. I numeri prodotti vengono poi interpretati e discussi nella relazione.
+Uno script eseguibile con un solo comando (es. `uv run eval`) che: carica i dataset di test, esegue ciascun agente sui rispettivi casi, calcola le metriche del §6.3–6.5 e produce un report tabellare. Per rispettare i limiti del free tier Groq, il runner usa pochi casi LLM rappresentativi ma mantiene la copertura di tutte le aree principali; le suite deterministiche (retrieval e learning loop) restano complete perché non consumano token. Riproducibile da chiunque, è al tempo stesso "valutazione strutturata" e prova di riproducibilità — due requisiti della rubrica soddisfatti dallo stesso artefatto. I numeri prodotti vengono poi interpretati e discussi nella relazione.
 
 ### 6.7 Limiti noti (onestà ingegneristica)
 

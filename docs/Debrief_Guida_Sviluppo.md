@@ -154,13 +154,13 @@ Tutti gli output strutturati passano per validazione Pydantic nel livello applic
 
 ## Modelli Groq (da config.py)
 
-| Componente    | Modello                     | Motivazione                                          |
-| ------------- | --------------------------- | ---------------------------------------------------- |
-| Orchestratore | `openai/gpt-oss-20b`        | veloce, output cortissimo                            |
+| Componente    | Modello                     | Motivazione                                              |
+| ------------- | --------------------------- | -------------------------------------------------------- |
+| Orchestratore | `openai/gpt-oss-20b`        | veloce, output cortissimo                                |
 | Triage        | `openai/gpt-oss-120b`       | buon rapporto capacità/affidabilità per JSON strutturato |
-| Investigator  | `openai/gpt-oss-120b`       | ragionamento su evidenze                             |
-| Resolver      | `openai/gpt-oss-120b`       | output lungo e ragionato                             |
-| Embedding     | `all-MiniLM-L6-v2` (locale) | costo zero                                           |
+| Investigator  | `openai/gpt-oss-120b`       | ragionamento su evidenze                                 |
+| Resolver      | `openai/gpt-oss-120b`       | output lungo e ragionato                                 |
+| Embedding     | `all-MiniLM-L6-v2` (locale) | costo zero                                               |
 
 Verifica disponibilità su console.groq.com prima di iniziare. I nomi stanno in `config.py`, MAI hardcoded altrove.
 
@@ -186,7 +186,7 @@ Attivi: INC-009 (helpdesk SEV4), INC-010 (network SEV3). Da classificare: INC-01
 uv sync                    # installa dipendenze
 uv run seed                # popola DB da zero
 uv run dev                 # avvia backend (FastAPI)
-uv run eval                # esegue valutazione
+uv run eval                # autovalutazione
 ```
 
 ## Soglie da calibrare
