@@ -156,10 +156,10 @@ Tutti gli output strutturati passano per validazione Pydantic nel livello applic
 
 | Componente    | Modello                     | Motivazione                                          |
 | ------------- | --------------------------- | ---------------------------------------------------- |
-| Orchestratore | `llama-3.1-8b-instant`      | veloce, output cortissimo                            |
-| Triage        | `gpt-oss-20b`               | buon rapporto velocità/capacità per JSON strutturato |
-| Investigator  | `llama-3.3-70b-versatile`   | ragionamento su evidenze                             |
-| Resolver      | `llama-3.3-70b-versatile`   | output lungo e ragionato                             |
+| Orchestratore | `openai/gpt-oss-20b`        | veloce, output cortissimo                            |
+| Triage        | `openai/gpt-oss-120b`       | buon rapporto capacità/affidabilità per JSON strutturato |
+| Investigator  | `openai/gpt-oss-120b`       | ragionamento su evidenze                             |
+| Resolver      | `openai/gpt-oss-120b`       | output lungo e ragionato                             |
 | Embedding     | `all-MiniLM-L6-v2` (locale) | costo zero                                           |
 
 Verifica disponibilità su console.groq.com prima di iniziare. I nomi stanno in `config.py`, MAI hardcoded altrove.

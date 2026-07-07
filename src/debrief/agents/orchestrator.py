@@ -4,7 +4,7 @@ orchestrator.py - LLM router che decide quale agente gestisce ogni messaggio.
 A ogni messaggio in chat riceve il testo, lo status dell'incidente e la descrizione,
 e restituisce la risposta dell'agente appropriato.
 
-Il router usa llama-3.1-8b-instant: modello piccolo, output JSON vincolato,
+Il router usa openai/gpt-oss-20b: modello piccolo, output JSON vincolato,
 costo token trascurabile rispetto agli agenti principali.
 """
 
@@ -73,7 +73,7 @@ def create_router_agent() -> Agent:
     """Crea il router agent: modello piccolo, output JSON deterministico."""
     return Agent(
         name="Router",
-        # Modello piccolo (8B) + temperature 0.0: il routing dev'essere veloce e
+        # Modello piccolo + temperature 0.0: il routing dev'essere veloce e
         # SEMPRE uguale a parità di input. Costo in token trascurabile.
         model=Groq(id=MODELS["orchestrator"], temperature=TEMPERATURE["orchestrator"]),
         description="Routes incident chat messages to the correct specialist agent.",

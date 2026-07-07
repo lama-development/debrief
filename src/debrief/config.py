@@ -21,12 +21,12 @@ load_dotenv()
 # Modelli Groq
 # Un dizionario (dict): struttura chiave -> valore. Associa a ogni agente il
 # nome del modello LLM che deve usare. Il router (orchestrator) usa un modello
-# piccolo e veloce; gli agenti "di sostanza" usano il modello grande da 70B.
+# piccolo e veloce; gli agenti "di sostanza" usano un modello più capace.
 MODELS = {
-    "orchestrator": "llama-3.1-8b-instant",
-    "triage": "llama-3.3-70b-versatile",
-    "investigator": "llama-3.3-70b-versatile",
-    "resolver": "llama-3.3-70b-versatile",
+    "orchestrator": "openai/gpt-oss-20b",
+    "triage": "openai/gpt-oss-120b",
+    "investigator": "openai/gpt-oss-120b",
+    "resolver": "openai/gpt-oss-120b",
 }
 
 # Embedding (locale)

@@ -135,7 +135,7 @@ Gli agenti non sono tre prompt sullo stesso modello: si distinguono per **tool**
 
 **Trade-off e mitigazione.** Un orchestratore LLM introduce **una chiamata di inferenza aggiuntiva per ogni messaggio**, solo per decidere il routing. Questo pesa sui rate limit del provider (vedi Modulo 5 — selezione modelli e costi), in particolare sul tetto token/minuto. La mitigazione è duplice e va considerata parte integrante del design:
 
-1. Il *solo router* gira su un modello **piccolo e veloce** (es. Llama 8B) con un output vincolato e brevissimo: deve restituire l'agente da attivare (e poco più), non ragionare. Costa pochissimi token.
+1. Il *solo router* gira su un modello **piccolo e veloce** (es. GPT-OSS 20B) con un output vincolato e brevissimo: deve restituire l'agente da attivare (e poco più), non ragionare. Costa pochissimi token.
 2. Lo **stato dell'incidente** (la fase) viene passato al router come contesto e restringe a priori le opzioni sensate (in fase di triage difficilmente serve il resolver), riducendo l'ambiguità e quindi la lunghezza del ragionamento necessario.
 
 Questa combinazione mantiene il vantaggio della flessibilità senza far esplodere il consumo di token. È un esempio concreto di decisione architetturale presa *con consapevolezza dei vincoli di inferenza*, non a scatola chiusa.
@@ -156,10 +156,10 @@ La scelta del modello è differenziata per compito — un punto che la rubrica r
 
 | Componente | Tipo di compito | Modello (indicativo) | Motivazione |
 |---|---|---|---|
-| Orchestratore / router | Decisione vincolata, output cortissimo | Modello piccolo e veloce (es. Llama 8B) | Bassa latenza, costo token trascurabile |
+| Orchestratore / router | Decisione vincolata, output cortissimo | Modello piccolo e veloce (es. GPT-OSS 20B) | Bassa latenza, costo token trascurabile |
 | Triage Agent | Classificazione + sintesi breve | Modello piccolo/medio | Compito strutturato, non richiede ragionamento profondo |
-| Investigator Agent | Ragionamento su evidenze recuperate | Modello grande (es. Llama 70B) | Sintesi di pattern e root cause richiede più capacità |
-| Resolver Agent | Sintesi di remediation + post-mortem | Modello grande (es. Llama 70B) | Output lungo e ragionato, qualità prioritaria |
+| Investigator Agent | Ragionamento su evidenze recuperate | Modello grande (es. GPT-OSS 120B) | Sintesi di pattern e root cause richiede più capacità |
+| Resolver Agent | Sintesi di remediation + post-mortem | Modello grande (es. GPT-OSS 120B) | Output lungo e ragionato, qualità prioritaria |
 | Embedding (RAG) | Rappresentazione vettoriale | sentence-transformers (locale) | Costo zero, nessun rate limit, sufficiente per il dataset |
 
 I nomi precisi dei modelli sono indicativi e verranno fissati nel Modulo 5 (scelte tecniche e costi), dopo verifica della disponibilità sul provider al momento dello sviluppo.
@@ -436,10 +436,10 @@ I modelli vanno scelti per compito, non uno per tutto (la "consapevolezza nella 
 
 | Componente | Compito | Modello (al momento attuale) | Motivazione |
 |---|---|---|---|
-| Orchestratore/router | Decisione vincolata, output cortissimo | `llama-3.1-8b` o `gpt-oss-20b` | Latenza minima, costo token trascurabile |
-| Triage | Classificazione + JSON strutturato | `gpt-oss-20b` | Veloce, capace su output strutturato |
-| Investigator | Ragionamento su evidenze recuperate | `gpt-oss-120b` o `llama-3.3-70b` | Capacità di sintesi e ragionamento superiore |
-| Resolver | Remediation + post-mortem (output lungo) | `gpt-oss-120b` o `llama-3.3-70b` | Qualità prioritaria su output articolato |
+| Orchestratore/router | Decisione vincolata, output cortissimo | `openai/gpt-oss-20b` | Latenza minima, costo token trascurabile |
+| Triage | Classificazione + JSON strutturato | `openai/gpt-oss-120b` | Capace e affidabile su output strutturato |
+| Investigator | Ragionamento su evidenze recuperate | `openai/gpt-oss-120b` | Capacità di sintesi e ragionamento superiore |
+| Resolver | Remediation + post-mortem (output lungo) | `openai/gpt-oss-120b` | Qualità prioritaria su output articolato |
 | Embedding | Rappresentazione vettoriale | sentence-transformers (locale) | Costo zero, nessun rate limit |
 
 Groq supporta JSON mode e tool use, requisito necessario per l'output strutturato del triage (§3.1).
