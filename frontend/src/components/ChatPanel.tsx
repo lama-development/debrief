@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Bot, Loader2, Search, Send, User as UserIcon } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Bot, ExternalLink, Loader2, Search, Send, User as UserIcon } from "lucide-react"
 import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -27,6 +28,25 @@ interface ChatMessage {
 
 const ASSISTANT_ACTORS = new Set(["triage", "investigator", "resolver"])
 const CLOSED_STATUSES: IncidentStatus[] = ["resolved"]
+const INCIDENT_REFERENCE_RE = /\b(INC-\d{3,})\b/g
+const EXISTING_INCIDENT_LINK_RE = /(\[INC-\d{3,}\]\([^)]+\))/g
+const CODE_FENCE_OR_INLINE_RE = /(```[\s\S]*?```|`[^`\n]+`)/g
+
+function linkIncidentReferences(markdown: string) {
+  return markdown
+    .split(CODE_FENCE_OR_INLINE_RE)
+    .map((codeOrText, idx) => {
+      if (idx % 2 === 1) return codeOrText
+      return codeOrText
+        .split(EXISTING_INCIDENT_LINK_RE)
+        .map((part, partIdx) => {
+          if (partIdx % 2 === 1) return part
+          return part.replace(INCIDENT_REFERENCE_RE, "[$1](/incidents/$1)")
+        })
+        .join("")
+    })
+    .join("")
+}
 
 // Costruisce la cronologia iniziale della chat dagli eventi di timeline.
 function seedMessages(events: TimelineEvent[]): ChatMessage[] {
@@ -329,8 +349,32 @@ function MessageBubble({
               message.content
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-pre:my-1 prose-code:text-sm">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ href, children }) => {
+                      const isIncidentLink = href !== undefined && /^\/incidents\/INC-\d{3,}$/.test(href)
+                      if (isIncidentLink) {
+                        return (
+                          <Link
+                            to={href}
+                            className="inline-flex items-center gap-1 rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          >
+                            {children}
+                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          </Link>
+                        )
+                      }
+
+                      return (
+                        <a href={href} target="_blank" rel="noreferrer">
+                          {children}
+                        </a>
+                      )
+                    },
+                  }}
+                >
+                  {linkIncidentReferences(message.content)}
                 </ReactMarkdown>
               </div>
             )}
