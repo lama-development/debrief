@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { incidentsApi } from "@/lib/api"
 
-// Dettaglio completo di un incidente (campi + timeline + post-mortem).
+// Dettaglio completo di un incidente (campi + timeline + debriefing).
 export function useIncident(id: string) {
   return useQuery({
     queryKey: ["incident", id],

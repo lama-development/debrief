@@ -6,7 +6,7 @@ vettori (gli embedding) e sa trovare velocemente i più "vicini" a un vettore di
 query. È il motore del RAG.
 
 Gestisce le tre collezioni (tabelle):
-- past_incidents: incidenti chiusi con post-mortem
+- past_incidents: incidenti chiusi con debriefing
 - knowledge_base: runbook e documentazione
 - verified_solutions: soluzioni fornite da umani (priorità alta)
 """

@@ -35,7 +35,7 @@ export interface TimelineEvent {
   content: string | null
 }
 
-export interface PostMortem {
+export interface DebriefReport {
   incident_id: string
   title: string
   severity: Severity
@@ -53,7 +53,7 @@ export interface IncidentParticipant {
 export interface IncidentDetail extends Incident {
   involved_teams: string[]
   timeline: TimelineEvent[]
-  post_mortem: PostMortem | null
+  debrief_report: DebriefReport | null
   participants: IncidentParticipant[]
 }
 

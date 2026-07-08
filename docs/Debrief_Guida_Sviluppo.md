@@ -14,7 +14,7 @@ debrief/
 ├── src/debrief/
 │   ├── __init__.py
 │   ├── config.py                # modelli, soglie, path DB
-│   ├── schemas.py               # Pydantic: TriageOutput, PostMortem, VerifiedSolution
+│   ├── schemas.py               # Pydantic: TriageOutput, DebriefReport, VerifiedSolution
 │   ├── database.py              # setup SQLite + tabelle
 │   ├── agents/
 │   │   ├── __init__.py
@@ -93,7 +93,7 @@ class TimelineEvent(BaseModel):
     actor: str                       # user_id o agent name
     content: str
 
-class PostMortem(BaseModel):
+class DebriefReport(BaseModel):
     incident_id: str
     title: str
     severity: Severity
@@ -118,7 +118,7 @@ incident_participants (incident_id, user_id, joined_at, last_activity_at)
 verified_solutions    (id, incident_id, problem_context, solution, provided_by, created_at)
 timeline_events (id, incident_id, timestamp, event_type, actor, content)
 teams           (id, name, description, contact_info)
-post_mortems    (id, incident_id, content_json, created_at)
+debrief_reports    (id, incident_id, content_json, created_at)
 ```
 
 ## Collezioni LanceDB
@@ -126,7 +126,7 @@ post_mortems    (id, incident_id, content_json, created_at)
 | Collezione           | Contenuto                      | Testo incorporato                     | Priorità retrieval |
 | -------------------- | ------------------------------ | ------------------------------------- | ------------------ |
 | `verified_solutions` | Soluzioni fornite da umani     | problem_context + solution            | ALTA               |
-| `past_incidents`     | Incidenti chiusi + post-mortem | description + root_cause + resolution | MEDIA              |
+| `past_incidents`     | Incidenti chiusi + debriefing | description + root_cause + resolution | MEDIA              |
 | `knowledge_base`     | Runbook/playbook               | testo completo (chunked se lungo)     | BASE               |
 
 ## Tool per agente

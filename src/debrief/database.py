@@ -16,7 +16,7 @@ transazioni: chiama la funzione e ottiene il risultato già salvato.
 import sqlite3   # driver SQLite incluso in Python
 import os         # per creare cartelle / leggere env
 import re         # espressioni regolari (regex), qui per estrarre il numero dall'ID
-import json       # per serializzare/deserializzare i post-mortem come testo JSON
+import json       # per serializzare/deserializzare i debriefing come testo JSON
 from datetime import datetime
 
 from debrief.config import SQLITE_PATH
@@ -102,7 +102,7 @@ def create_tables(conn: sqlite3.Connection):
             FOREIGN KEY (incident_id) REFERENCES incidents(id)
         );
 
-        CREATE TABLE IF NOT EXISTS post_mortems (
+        CREATE TABLE IF NOT EXISTS debrief_reports (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             incident_id TEXT UNIQUE NOT NULL,
             content_json TEXT NOT NULL,
@@ -148,7 +148,7 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
     """Carica gli incidenti seed in SQLite rispettando lo `status` di ciascuno.
 
     Il dataset di seed contiene un mix dei 3 stati per mostrare tutti i casi:
-    - 'resolved' → incidenti passati e chiusi (con root_cause/resolution + post-mortem);
+    - 'resolved' → incidenti passati e chiusi (con root_cause/resolution + debriefing);
     - 'active'   → incidenti classificati e in lavorazione (senza risoluzione);
     - 'open'     → incidenti dichiarati ma non ancora classificati (senza categoria/severità).
     Lo status di default è 'resolved' se il campo manca."""
@@ -169,16 +169,16 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
         )
 
         if status == "resolved":
-            post_mortem = {
+            debrief_report = {
                 "incident_id": inc["id"],
                 "title": inc["title"],
                 "severity": inc["severity"],
                 "resolution": inc.get("resolution", ""),
             }
             conn.execute(
-                "INSERT OR REPLACE INTO post_mortems (incident_id, content_json) VALUES (?, ?)",
+                "INSERT OR REPLACE INTO debrief_reports (incident_id, content_json) VALUES (?, ?)",
                 # ensure_ascii=False → mantiene gli accenti italiani leggibili nel JSON.
-                (inc["id"], json.dumps(post_mortem, ensure_ascii=False))
+                (inc["id"], json.dumps(debrief_report, ensure_ascii=False))
             )
 
     conn.commit()
@@ -430,12 +430,12 @@ def get_timeline(incident_id: str, db_path: str | None = None) -> list[dict]:
         conn.close()
 
 
-def save_post_mortem(incident_id: str, content_json: str, db_path: str | None = None):
-    """Salva (o sostituisce) il post-mortem di un incidente come JSON."""
+def save_debrief_report(incident_id: str, content_json: str, db_path: str | None = None):
+    """Salva (o sostituisce) il debriefing di un incidente come JSON."""
     conn = get_connection(db_path)
     try:
         conn.execute(
-            "INSERT OR REPLACE INTO post_mortems (incident_id, content_json) VALUES (?, ?)",
+            "INSERT OR REPLACE INTO debrief_reports (incident_id, content_json) VALUES (?, ?)",
             (incident_id, content_json),
         )
         conn.commit()
@@ -443,12 +443,12 @@ def save_post_mortem(incident_id: str, content_json: str, db_path: str | None = 
         conn.close()
 
 
-def get_post_mortem(incident_id: str, db_path: str | None = None) -> dict | None:
-    """Restituisce il post-mortem (parsato da JSON) di un incidente, o None."""
+def get_debrief_report(incident_id: str, db_path: str | None = None) -> dict | None:
+    """Restituisce il debriefing (parsato da JSON) di un incidente, o None."""
     conn = get_connection(db_path)
     try:
         row = conn.execute(
-            "SELECT content_json FROM post_mortems WHERE incident_id = ?",
+            "SELECT content_json FROM debrief_reports WHERE incident_id = ?",
             (incident_id,),
         ).fetchone()
         # json.loads = da testo JSON a dict Python. Lo facciamo solo se row esiste.

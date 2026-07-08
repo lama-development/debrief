@@ -14,7 +14,7 @@
 
 ## Come funziona
 
-Debrief sposta il valore cognitivo del triage dall'essere umano agli agenti: classificazione in linguaggio naturale, recall semantico degli incidenti passati via RAG, e post-mortem generato automaticamente alla chiusura.
+Debrief sposta il valore cognitivo del triage dall'essere umano agli agenti: classificazione in linguaggio naturale, recall semantico degli incidenti passati via RAG, e debriefing generato automaticamente alla chiusura.
 
 ### Agenti
 
@@ -22,7 +22,7 @@ Debrief sposta il valore cognitivo del triage dall'essere umano agli agenti: cla
 | ---------------- | ---------------------------------------------------------------- |
 | **Triage**       | Classifica severity, priorità e team coinvolti dal testo libero  |
 | **Investigator** | Cerca incidenti simili via RAG (embedding semantico)             |
-| **Resolver**     | Propone remediation, traccia la chiusura e genera il post-mortem |
+| **Resolver**     | Propone remediation, traccia la chiusura e genera il debriefing |
 
 ## Stack
 

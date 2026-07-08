@@ -60,7 +60,7 @@ def list_all(status: str | None = None, limit: int = 100,
 
 @router.get("/{incident_id}")
 def detail(incident_id: str, user: dict = Depends(auth.current_user)):
-    """Dettaglio completo: incidente + timeline + remediation + post-mortem."""
+    """Dettaglio completo: incidente + timeline + remediation + debriefing."""
     # {incident_id} nel path → FastAPI lo passa come argomento omonimo.
     return _require_incident(incident_id, user["id"])
 

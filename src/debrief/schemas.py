@@ -65,7 +65,7 @@ class TimelineEvent(BaseModel):
     content: str
 
 
-class PostMortem(BaseModel):
+class DebriefReport(BaseModel):
     """Generato dal resolver alla chiusura. Re-indicizzato in LanceDB."""
     incident_id: str
     title: str

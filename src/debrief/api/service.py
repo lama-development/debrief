@@ -29,7 +29,7 @@ from debrief.agents.investigator import create_investigator_agent, build_investi
 from debrief.agents.resolver import create_resolver_agent, build_resolution_prompt
 from debrief.api.lifecycle import advance_status
 from debrief.rag.indexer import get_db, add_past_incident, add_verified_solution, _build_incident_text
-from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, PostMortem, RoutingDecision, Severity, TimelineEvent, TriageOutput, VerifiedSolution
+from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent, TriageOutput, VerifiedSolution
 from debrief.tools.embedding import embed_text
 
 
@@ -378,7 +378,7 @@ def join_incident(incident_id: str, user_id: str) -> None:
 
 
 def get_incident_detail(incident_id: str) -> dict | None:
-    """Incidente completo: campi + timeline + remediation + post-mortem + team correnti."""
+    """Incidente completo: campi + timeline + remediation + debriefing + team correnti."""
     incident = db.get_incident(incident_id)
     if incident is None:
         return None
@@ -386,7 +386,7 @@ def get_incident_detail(incident_id: str) -> dict | None:
         **incident,
         "involved_teams": db.get_incident_teams(incident_id),
         "timeline": db.get_timeline(incident_id),
-        "post_mortem": db.get_post_mortem(incident_id),
+        "debrief_report": db.get_debrief_report(incident_id),
         "participants": db.get_incident_participants(incident_id),
     }
 
@@ -438,7 +438,7 @@ def override_classification(
 
 
 def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str) -> dict:
-    """Chiude un incidente (azione esplicita). Genera il post-mortem e lancia il
+    """Chiude un incidente (azione esplicita). Genera il debriefing e lancia il
     loop di apprendimento re-indicizzando l'incidente risolto.
 
     Solleva ValueError se la transizione RESOLVED non è consentita dallo stato.
@@ -459,9 +459,9 @@ def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str
     db.set_incident_status(incident_id, new_status, resolved_at=resolved_at)
     db.add_timeline_event(incident_id, "resolution", provided_by, resolution_summary)
 
-    # Post-mortem: lo costruiamo e lo salviamo come JSON.
-    post_mortem = _build_post_mortem(incident, resolution_summary)
-    db.save_post_mortem(incident_id, json.dumps(post_mortem, ensure_ascii=False))
+    # Debriefing: lo costruiamo e lo salviamo come JSON.
+    debrief_report = _build_debrief_report(incident, resolution_summary)
+    db.save_debrief_report(incident_id, json.dumps(debrief_report, ensure_ascii=False))
 
     # Loop di apprendimento: re-indicizziamo l'incidente risolto in LanceDB (append)
     # così diventa subito ricercabile dagli agenti per i casi futuri.
@@ -513,11 +513,11 @@ def get_metrics() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Helper interni: post-mortem + indicizzazione
+# Helper interni: debriefing + indicizzazione
 # ---------------------------------------------------------------------------
 
-def _build_post_mortem(incident: dict, resolution_summary: str) -> dict:
-    """Assembla un PostMortem minimale (v1) a partire da incidente + timeline.
+def _build_debrief_report(incident: dict, resolution_summary: str) -> dict:
+    """Assembla un DebriefReport minimale (v1) a partire da incidente + timeline.
     Impact/detection/root_cause non sono derivati automaticamente in questa
     versione; resolution_steps contiene il riepilogo di chiusura fornito."""
     # Severity(stringa) prova a convertire il testo nell'Enum; se il valore è
@@ -544,7 +544,7 @@ def _build_post_mortem(incident: dict, resolution_summary: str) -> dict:
             # dati non validi (es. timestamp non parsabile) invece di bloccare tutto.
             continue
 
-    pm = PostMortem(
+    report = DebriefReport(
         incident_id=incident["id"],
         title=incident["title"],
         severity=severity,
@@ -552,7 +552,7 @@ def _build_post_mortem(incident: dict, resolution_summary: str) -> dict:
         resolution=resolution_summary,
     )
     # Restituiamo un dict JSON-compatibile (così il chiamante può serializzarlo).
-    return pm.model_dump(mode="json")
+    return report.model_dump(mode="json")
 
 
 def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:

@@ -12,7 +12,7 @@ Quando in un reparto IT o in un team di sviluppo qualcosa si rompe — un serviz
 - capire *quanto è grave* e *chi è impattato* mentre le informazioni arrivano frammentate e sotto stress;
 - decidere *chi coinvolgere* (quale team, quale responsabile) senza perdere minuti preziosi;
 - ricostruire *se è già successo* e *cosa avevamo fatto l'ultima volta* — conoscenza che tipicamente vive nella testa delle persone e si disperde quando qualcuno cambia ruolo o lascia l'azienda;
-- documentare l'accaduto in un **post-mortem** che, nella pratica, viene scritto malvolentieri, in ritardo, o mai.
+- documentare l'accaduto in un **debriefing** che, nella pratica, viene scritto malvolentieri, in ritardo, o mai.
 
 Il risultato è un costo ricorrente e silenzioso: incidenti gestiti due volte da zero, conoscenza tribale non capitalizzata, metriche di affidabilità (MTTR, frequenza, ricorrenza) che nessuno ha il tempo di calcolare. Il problema, in altre parole, non è di *storage* — è di **cognizione e recall sotto pressione**.
 
@@ -23,7 +23,7 @@ Un sistema di ticketing tradizionale risolve la parte facile: registra, assegna,
 - **Classificazione della severità** ricavata dal linguaggio naturale della segnalazione, non da una dropdown compilata male.
 - **Recall semantico** degli incidenti passati: non una ricerca per parole chiave ("502") ma per *significato* ("il gateway restituisce errori intermittenti sotto carico"), che ritrova casi descritti con parole diverse ma di fatto analoghi.
 - **Sintesi di remediation**: aggregare ciò che ha funzionato in casi simili in passi concreti, invece di lasciarlo nella memoria di chi c'era.
-- **Post-mortem automatico**: trasformare la timeline e la conversazione dell'incidente in un documento strutturato, riducendo a zero l'attrito che oggi fa sì che non venga scritto.
+- **Debriefing automatico**: trasformare la timeline e la conversazione dell'incidente in un documento strutturato, riducendo a zero l'attrito che oggi fa sì che non venga scritto.
 
 In una frase: *un ticketing tool conserva, un'applicazione intelligente ragiona sul contenuto e capitalizza la conoscenza*. Questo è anche il motivo per cui un LLM è uno strumento appropriato e non decorativo: i compiti centrali (classificare testo libero, recuperare per significato, sintetizzare) sono esattamente quelli su cui i modelli linguistici offrono un vantaggio reale.
 
@@ -37,7 +37,7 @@ Scenario tipico (il "happy path" che la demo deve mostrare):
 2. Si apre una **chat dedicata all'incidente** in cui operano gli agenti di Debrief.
 3. L'agente di triage assegna la severità, suggerisce chi coinvolgere e pubblica un riassunto iniziale; se l'informazione è insufficiente, *chiede dettagli* (human-in-the-loop).
 4. Durante l'indagine, i membri del team interrogano il sistema con menzioni tipo `@debrief what's happening?` o `@debrief any similar incidents?` e ricevono risposte fondate su incidenti passati e knowledge base.
-5. Alla risoluzione, l'agente resolver propone i passi di remediation e, alla chiusura, il sistema **genera il post-mortem** e archivia tutto.
+5. Alla risoluzione, l'agente resolver propone i passi di remediation e, alla chiusura, il sistema **genera il debriefing** e archivia tutto.
 
 ### 1.4 Ambito del progetto: cosa è e cosa non è
 
@@ -49,7 +49,7 @@ Per onestà ingegneristica (e perché la rubrica premia la consapevolezza dei li
 
 ### 1.5 Nota sul naming
 
-Il sistema si chiama **Debrief**. Il nome è stato scelto per allinearsi al tratto distintivo del progetto — l'apprendimento dopo l'incidente — più che alla generica idea di sorveglianza comune a tutti gli strumenti della categoria: il *debrief* è il resoconto che segue un'operazione, ed è esattamente ciò che il sistema produce e capitalizza con il post-mortem automatico. Soddisfa anche il vincolo pratico dell'handle in chat: `@debrief` è corto, pronunciabile e leggibile. Una verifica preliminare non ha rilevato prodotti omonimi nello spazio dell'incident management, dove il termine circola come concetto generico ma non come nome di prodotto.
+Il sistema si chiama **Debrief**. Il nome è stato scelto per allinearsi al tratto distintivo del progetto — l'apprendimento dopo l'incidente — più che alla generica idea di sorveglianza comune a tutti gli strumenti della categoria: il *debrief* è il resoconto che segue un'operazione, ed è esattamente ciò che il sistema produce e capitalizza con il debriefing automatico. Soddisfa anche il vincolo pratico dell'handle in chat: `@debrief` è corto, pronunciabile e leggibile. Una verifica preliminare non ha rilevato prodotti omonimi nello spazio dell'incident management, dove il termine circola come concetto generico ma non come nome di prodotto.
 
 
 ## Modulo 2 — Architettura del Sistema
@@ -69,7 +69,7 @@ stateDiagram-v2
     Attivo --> InRisoluzione: identificata la root cause probabile
     InRisoluzione --> InRisoluzione: proposta dei passi di remediation
     InRisoluzione --> Risolto: l'utente conferma la chiusura
-    Risolto --> Archiviato: post-mortem generato e salvato nel DB
+    Risolto --> Archiviato: debriefing generato e salvato nel DB
     Archiviato --> [*]
 ```
 
@@ -125,7 +125,7 @@ Gli agenti non sono tre prompt sullo stesso modello: si distinguono per **tool**
 
 **Investigator Agent.** Attivo nella fase di indagine. Risponde a richieste come `@debrief what's happening?` o `@debrief any similar incidents?`. Interroga LanceDB per recuperare incidenti passati semanticamente simili, identifica pattern ricorrenti e possibili root cause. Tool: ricerca semantica su LanceDB + lettura della timeline su SQLite.
 
-**Resolver Agent.** Attivo nella fase di risoluzione. Propone in chat passi fondati su knowledge base, soluzioni umane e incidenti analoghi. La chiusura esplicita dell'utente salva timeline e post-mortem e alimenta il learning loop.
+**Resolver Agent.** Attivo nella fase di risoluzione. Propone in chat passi fondati su knowledge base, soluzioni umane e incidenti analoghi. La chiusura esplicita dell'utente salva timeline e debriefing e alimenta il learning loop.
 
 **Orchestratore (coordinatore).** Non è un quarto "personaggio" visibile all'utente, ma il livello che decide *quale agente deve rispondere* a un dato messaggio. È implementato con il pattern *Team* di Agno con un coordinatore basato su LLM (vedi §2.4 per il perché e i trade-off).
 
@@ -144,7 +144,7 @@ Questa combinazione mantiene il vantaggio della flessibilità senza far esploder
 
 Una distinzione progettuale importante: il sistema usa **due database con ruoli diversi**, e tenerli separati è una scelta consapevole.
 
-**SQLite — stato strutturato.** Conserva incidenti, timeline, post-mortem, utenti, sessioni di autenticazione, partecipanti alle conversazioni e copie persistenti delle soluzioni umane verificate. La tabella `incident_participants` collega utenti e incidenti e registra l'ultima attività. È ciò che alimenta dashboard, conversazioni riprendibili e metriche. SQLite è scelto per semplicità e **riproducibilità** (file unico, zero configurazione, stato ricreabile da seed) — requisito esplicito della rubrica.
+**SQLite — stato strutturato.** Conserva incidenti, timeline, debriefing, utenti, sessioni di autenticazione, partecipanti alle conversazioni e copie persistenti delle soluzioni umane verificate. La tabella `incident_participants` collega utenti e incidenti e registra l'ultima attività. È ciò che alimenta dashboard, conversazioni riprendibili e metriche. SQLite è scelto per semplicità e **riproducibilità** (file unico, zero configurazione, stato ricreabile da seed) — requisito esplicito della rubrica.
 
 **LanceDB — recupero semantico.** Conserva le rappresentazioni vettoriali su cui si fa la ricerca per significato, in **tre collezioni distinte**: incidenti passati, knowledge base e **soluzioni verificate da umano** (vedi §3.3 e Modulo 4). È usato da investigator e resolver per il recall. È lo strumento visto a lezione, il che ne facilita la motivazione.
 
@@ -159,7 +159,7 @@ La scelta del modello è differenziata per compito — un punto che la rubrica r
 | Orchestratore / router | Decisione vincolata, output cortissimo | Modello piccolo e veloce (es. GPT-OSS 20B) | Bassa latenza, costo token trascurabile |
 | Triage Agent | Classificazione + sintesi breve | Modello piccolo/medio | Compito strutturato, non richiede ragionamento profondo |
 | Investigator Agent | Ragionamento su evidenze recuperate | Modello grande (es. GPT-OSS 120B) | Sintesi di pattern e root cause richiede più capacità |
-| Resolver Agent | Sintesi di remediation + post-mortem | Modello grande (es. GPT-OSS 120B) | Output lungo e ragionato, qualità prioritaria |
+| Resolver Agent | Sintesi di remediation + debriefing | Modello grande (es. GPT-OSS 120B) | Output lungo e ragionato, qualità prioritaria |
 | Embedding (RAG) | Rappresentazione vettoriale | sentence-transformers (locale) | Costo zero, nessun rate limit, sufficiente per il dataset |
 
 I nomi precisi dei modelli sono indicativi e verranno fissati nel Modulo 5 (scelte tecniche e costi), dopo verifica della disponibilità sul provider al momento dello sviluppo.
@@ -262,7 +262,7 @@ Nel prototipo l'urgenza operativa coincide con la severità, evitando un secondo
 
 ### 3.3 Resolver Agent
 
-**Ruolo.** Proporre passi di remediation grounded e supportare l'utente fino alla chiusura, quando il service genera e archivia il post-mortem.
+**Ruolo.** Proporre passi di remediation grounded e supportare l'utente fino alla chiusura, quando il service genera e archivia il debriefing.
 
 **Confini.** Non riclassifica l'incidente (compito del triage). Agisce nella fase di risoluzione.
 
@@ -283,10 +283,10 @@ La soluzione verificata viene salvata su SQLite e **incorporata e indicizzata in
 
 **Avvertenza onesta.** Una singola soluzione umana potrebbe non generalizzare. Per questo resta sempre un *suggerimento* mostrato a un umano con la sua provenance esplicita, non una risoluzione applicata in automatico (coerente con "il sistema suggerisce, non decide"). Il rischio e la mitigazione sono dichiarati anche nel Modulo 6.
 
-**Post-mortem (output strutturato).** Alla chiusura genera un documento conforme a schema:
+**Debriefing (output strutturato).** Alla chiusura genera un documento conforme a schema:
 
 ```python
-class PostMortem(BaseModel):
+class DebriefReport(BaseModel):
     incident_id: str
     title: str
     severity: Severity
@@ -299,13 +299,13 @@ class PostMortem(BaseModel):
     references: list[str]           # id di incidenti/KB citati
 ```
 
-**Il loop chiuso (punto di design forte).** Il post-mortem generato non viene solo salvato su SQLite: viene anche **incorporato (embedding) e indicizzato in LanceDB**, diventando materiale recuperabile nei futuri incidenti. Insieme alle soluzioni verificate da umano (sopra), il sistema *capitalizza la conoscenza* da due direzioni: ciò che ha risolto in autonomia e ciò che ha imparato dagli umani quando era in difficoltà. Ogni incidente risolto rende il sistema più capace sul successivo. Questo realizza concretamente la promessa del Modulo 1 (recall e capitalizzazione della conoscenza) e chiude il ciclo di vita.
+**Il loop chiuso (punto di design forte).** Il debriefing generato non viene solo salvato su SQLite: viene anche **incorporato (embedding) e indicizzato in LanceDB**, diventando materiale recuperabile nei futuri incidenti. Insieme alle soluzioni verificate da umano (sopra), il sistema *capitalizza la conoscenza* da due direzioni: ciò che ha risolto in autonomia e ciò che ha imparato dagli umani quando era in difficoltà. Ogni incidente risolto rende il sistema più capace sul successivo. Questo realizza concretamente la promessa del Modulo 1 (recall e capitalizzazione della conoscenza) e chiude il ciclo di vita.
 
-**Tool e validazione I/O.** `search_verified_solutions(query, k)`, `search_knowledge_base(query, k)` e `search_past_incidents(query, k)` in lettura su LanceDB; aggiornamento della checklist, scrittura del post-mortem e cattura della soluzione verificata via livello applicativo dopo validazione di schema; indicizzazione di post-mortem e soluzioni verificate in LanceDB. Stessa disciplina di validazione dell'investigator su query e risultati.
+**Tool e validazione I/O.** `search_verified_solutions(query, k)`, `search_knowledge_base(query, k)` e `search_past_incidents(query, k)` in lettura su LanceDB; aggiornamento della checklist, scrittura del debriefing e cattura della soluzione verificata via livello applicativo dopo validazione di schema; indicizzazione di debriefing e soluzioni verificate in LanceDB. Stessa disciplina di validazione dell'investigator su query e risultati.
 
 **System prompt e difese.** Ruolo di "ingegnere di remediation". Istruzione chiave sulla politica di grounding ibrida con etichettatura obbligatoria della provenienza. Difese trasversali §3.0; in più, il divieto di presentare conoscenza generale come se provenisse da incidenti reali.
 
-**Trigger.** Attivato dall'orchestratore quando il messaggio riguarda la risoluzione, e alla chiusura dell'incidente per la generazione del post-mortem.
+**Trigger.** Attivato dall'orchestratore quando il messaggio riguarda la risoluzione, e alla chiusura dell'incidente per la generazione del debriefing.
 
 ### 3.4 L'orchestratore — contratto di routing
 
@@ -317,7 +317,7 @@ L'orchestratore non è visibile all'utente. A ogni messaggio in chat riceve: il 
 |---|---|---|---|
 | **Fase** | Iniziale | Attiva (indagine) | Risoluzione + chiusura |
 | **Legge da** | Catalogo team | LanceDB + timeline | LanceDB (KB + incidenti) |
-| **Scrive** | Incidente classificato* | nulla | Checklist + post-mortem* + indice LanceDB |
+| **Scrive** | Incidente classificato* | nulla | Checklist + debriefing* + indice LanceDB |
 | **Output** | JSON validato (schema) | Testo con provenance | Testo + JSON validato |
 | **Grounding** | n/a | Strettamente ancorato | Ibrido, etichettato |
 | **Modello** | Piccolo/medio | Grande | Grande |
@@ -334,7 +334,7 @@ Questo modulo descrive da dove vengono i dati, come vengono trasformati in conos
 Coerentemente con §2.5, i dati vivono in due posti con scopi distinti:
 
 - **SQLite — stato vivo.** Incidenti attivi, timeline, checklist, team, utenti, metriche, e le sessioni/memoria persistite da Agno. È transazionale e strutturato.
-- **LanceDB — corpus semantico.** Tre collezioni separate: **`verified_solutions`** (soluzioni fornite da umani e catturate, §3.3), **`past_incidents`** (incidenti chiusi con i loro post-mortem) e **`knowledge_base`** (runbook e documentazione operativa). È ciò su cui si fa retrieval.
+- **LanceDB — corpus semantico.** Tre collezioni separate: **`verified_solutions`** (soluzioni fornite da umani e catturate, §3.3), **`past_incidents`** (incidenti chiusi con i loro debriefing) e **`knowledge_base`** (runbook e documentazione operativa). È ciò su cui si fa retrieval.
 
 La distinzione conta: l'investigator cerca *cosa è già successo* (`past_incidents`), il resolver cerca anche *come si fa in generale* (`knowledge_base`) e soprattutto *cosa abbiamo già imparato a risolvere* (`verified_solutions`, la fonte più affidabile).
 
@@ -346,7 +346,7 @@ Perché la demo sia significativa, il sistema deve partire con una memoria stori
 
 **Dimensione.** Un ordine di grandezza di circa 30–60 incidenti distribuiti su tutte le categorie, con alcuni cluster ricorrenti intenzionali, è sufficiente a rendere il retrieval interessante restando gestibile e istantaneo da indicizzare.
 
-**Struttura di ogni incidente di seed.** Comprende titolo, descrizione, severità, stato, risoluzione e timestamp. Gli incidenti risolti alimentano anche il post-mortem minimale e il corpus vettoriale.
+**Struttura di ogni incidente di seed.** Comprende titolo, descrizione, severità, stato, risoluzione e timestamp. Gli incidenti risolti alimentano anche il debriefing minimale e il corpus vettoriale.
 
 **Knowledge base.** Una manciata di runbook brevi in markdown (es. "gestione di un failover del database", "triage della latenza di rete"), che il resolver cita come pratica generale.
 
@@ -391,13 +391,13 @@ Flusso di una ricerca (es. investigator che risponde a "incidenti simili?"):
 
 **Filtro per metadati (evoluzione futura).** La versione corrente usa similarità semantica e soglia globale. Un filtro aggiuntivo per severità potrebbe ridurre ulteriormente i falsi positivi su dataset più grandi.
 
-**Il loop chiuso a runtime (due sorgenti di apprendimento).** Alla chiusura di un incidente (§3.3), il suo post-mortem viene incorporato e aggiunto a `past_incidents`. Inoltre, ogni volta che un umano fornisce una soluzione in risposta a un'escalation del resolver, questa viene catturata e aggiunta a `verified_solutions`. In entrambi i casi è la stessa pipeline del seed applicata a runtime a un singolo record: il corpus cresce e il sistema diventa più capace a ogni risoluzione, sia che risolva da solo sia che impari da un umano.
+**Il loop chiuso a runtime (due sorgenti di apprendimento).** Alla chiusura di un incidente (§3.3), il suo debriefing viene incorporato e aggiunto a `past_incidents`. Inoltre, ogni volta che un umano fornisce una soluzione in risposta a un'escalation del resolver, questa viene catturata e aggiunta a `verified_solutions`. In entrambi i casi è la stessa pipeline del seed applicata a runtime a un singolo record: il corpus cresce e il sistema diventa più capace a ogni risoluzione, sia che risolva da solo sia che impari da un umano.
 
 ### 4.7 Qualità della pipeline e modalità di fallimento
 
-**Consistenza tra SQLite e LanceDB.** SQLite è la sorgente di verità per lo stato dell'incidente: la chiusura, la timeline e il post-mortem vengono persistiti prima di aggiornare il corpus vettoriale. L'indicizzazione runtime è *best effort*: se embedding o LanceDB non sono disponibili, la chiusura resta valida e l'errore viene registrato per la diagnosi. In questo modo un componente derivato, usato per il retrieval, non rende incoerente l'operazione principale visibile all'utente.
+**Consistenza tra SQLite e LanceDB.** SQLite è la sorgente di verità per lo stato dell'incidente: la chiusura, la timeline e il debriefing vengono persistiti prima di aggiornare il corpus vettoriale. L'indicizzazione runtime è *best effort*: se embedding o LanceDB non sono disponibili, la chiusura resta valida e l'errore viene registrato per la diagnosi. In questo modo un componente derivato, usato per il retrieval, non rende incoerente l'operazione principale visibile all'utente.
 
-La rubrica chiede una "pipeline dati di qualità". Gli accorgimenti previsti: schema coerente tra seed e dati a runtime (lo stesso `PostMortem`), i pattern ricorrenti intenzionali, la calibrazione della soglia di similarità, la dichiarazione esplicita della natura sintetica dei dati di seed.
+La rubrica chiede una "pipeline dati di qualità". Gli accorgimenti previsti: schema coerente tra seed e dati a runtime (lo stesso `DebriefReport`), i pattern ricorrenti intenzionali, la calibrazione della soglia di similarità, la dichiarazione esplicita della natura sintetica dei dati di seed.
 
 Degradazione con grazia: se il retrieval è vuoto o sotto soglia, l'agente lo comunica invece di inventare; se la soglia è tarata male, il sintomo è osservabile (troppi/troppo pochi match) e correggibile; il modello di embedding è caricato una volta all'avvio e la sua indisponibilità è un errore di setup esplicito, non un fallimento silenzioso a runtime.
 
@@ -439,7 +439,7 @@ I modelli vanno scelti per compito, non uno per tutto (la "consapevolezza nella 
 | Orchestratore/router | Decisione vincolata, output cortissimo | `openai/gpt-oss-20b` | Latenza minima, costo token trascurabile |
 | Triage | Classificazione + JSON strutturato | `openai/gpt-oss-120b` | Capace e affidabile su output strutturato |
 | Investigator | Ragionamento su evidenze recuperate | `openai/gpt-oss-120b` | Capacità di sintesi e ragionamento superiore |
-| Resolver | Remediation + post-mortem (output lungo) | `openai/gpt-oss-120b` | Qualità prioritaria su output articolato |
+| Resolver | Remediation + debriefing (output lungo) | `openai/gpt-oss-120b` | Qualità prioritaria su output articolato |
 | Embedding | Rappresentazione vettoriale | sentence-transformers (locale) | Costo zero, nessun rate limit |
 
 Groq supporta JSON mode e tool use, requisito necessario per l'output strutturato del triage (§3.1).
@@ -534,7 +534,7 @@ Riepilogo di ciò che il progetto fa e non fa, raccolto qui per chiarezza.
 - chat dell'incidente con tre agenti orchestrati da un router LLM;
 - triage con titolo, severità SEV1–SEV4, suggerimento dei team e human-in-the-loop per i dettagli mancanti;
 - investigator con retrieval semantico grounded sugli incidenti passati;
-- resolver con remediation grounded, **escalation a un umano quando non trova fonti e cattura della soluzione come conoscenza riutilizzabile**, e post-mortem automatico con loop chiuso;
+- resolver con remediation grounded, **escalation a un umano quando non trova fonti e cattura della soluzione come conoscenza riutilizzabile**, e debriefing automatico con loop chiuso;
 - **multi-utente con autenticazione semplice (username + password con hashing)**;
 - **conversazioni riprendibili:** partecipanti e timeline persistiti in SQLite, con contesto recente ricostruito per gli agenti;
 - dashboard con MTTR, conteggi e liste per stato;
@@ -556,7 +556,7 @@ L'ordine di sviluppo segue un principio guida: **il valore AI prima della presen
 2. **Strato dati:** dataset di seed con gruppi ricorrenti intenzionali, schema SQLite (incidenti, timeline, utenti), indicizzazione iniziale di incidenti e knowledge base, script `uv run seed` idempotente. *Gli ID rilevanti attesi sono annotati direttamente nei casi di valutazione del retrieval, senza mantenere una mappa duplicata.*
 3. **Strato di retrieval:** embedding locali, tool di ricerca con soglia di similarità e priorità tra fonti, testabili in isolamento.
 4. **Utenti e sessioni:** autenticazione semplice, partecipanti e timeline persistiti in SQLite (incidente = sessione condivisa e riapribile).
-5. **Agenti, uno alla volta:** triage (output strutturato + validazione) → investigator (grounded) → resolver (ibrido + post-mortem + escalation a umano con cattura della soluzione + loop chiuso). Ciascuno testabile via API appena pronto.
+5. **Agenti, uno alla volta:** triage (output strutturato + validazione) → investigator (grounded) → resolver (ibrido + debriefing + escalation a umano con cattura della soluzione + loop chiuso). Ciascuno testabile via API appena pronto.
 6. **Orchestratore** e logica di routing.
 7. **Superficie API (FastAPI):** login, CRUD incidenti, lista conversazioni per utente, endpoint chat con streaming SSE, endpoint metriche.
 8. **Harness di valutazione** (`uv run eval`), incluso il test del loop di apprendimento. *Da sviluppare in parallelo agli agenti, non alla fine: i dataset di test servono a iterare durante lo sviluppo, non solo a misurare a posteriori.*
@@ -579,9 +579,9 @@ Tabella di autovalutazione: dove il progetto risponde a ciascun criterio. Utile 
 | **Architettura e qualità tecnica (8)** | Separazione netta degli strati; "l'agente propone, il backend valida e scrive" (§3.0); id modelli in config e chiavi in env, password con hashing, nessun segreto hardcoded (§2.8, §5.1); riproducibilità via `uv run seed` da zero (§4.5) |
 | **Implementazione AI (8)** | Multi-agente orchestrato (Mod. 3); prompt engineering difensivo e provenance a fonti prioritizzate (§3.0); RAG con tre corpora e pipeline dati curata (Mod. 4); scelta dei modelli per compito (§5.3); tool con validazione I/O (§3.0–3.3) |
 | **Valutazione e critica (8)** | Harness riproducibile con metriche deterministiche per triage, routing, resolver, retrieval, injection e learning loop; durata delle suite e limiti dichiarati (§6.3–6.7) |
-| **UX e funzionalità (6)** | Flusso coerente dichiarazione→post-mortem; multi-utente con conversazioni riprendibili (§2.8); Agentic UI con streaming e stati visibili degli agenti (§2.7); dashboard comprensibile; degradazione con grazia (§4.7, §6.7) |
+| **UX e funzionalità (6)** | Flusso coerente dichiarazione→debriefing; multi-utente con conversazioni riprendibili (§2.8); Agentic UI con streaming e stati visibili degli agenti (§2.7); dashboard comprensibile; degradazione con grazia (§4.7, §6.7) |
 | **Bonus +1 complessità** | Orchestrazione multi-agente con router LLM (§2.4); doppio human-in-the-loop: dettagli nel triage (§3.1) ed escalation con apprendimento nel resolver (§3.3) |
-| **Bonus +1 originalità** | Loop chiuso di capitalizzazione della conoscenza da due sorgenti — post-mortem automatici e soluzioni umane catturate — che rende il sistema più capace a ogni incidente (§3.3, §4.6) |
+| **Bonus +1 originalità** | Loop chiuso di capitalizzazione della conoscenza da due sorgenti — debriefing automatici e soluzioni umane catturate — che rende il sistema più capace a ogni incidente (§3.3, §4.6) |
 
 
 ## Conclusione

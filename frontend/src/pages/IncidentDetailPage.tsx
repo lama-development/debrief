@@ -18,7 +18,7 @@ import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels"
 import { useIncident, useReopenIncident } from "@/hooks/useIncident"
 import { useUpdateClassification } from "@/hooks/useUpdateClassification"
 import { ApiError } from "@/lib/api"
-import type { IncidentStatus, PostMortem, Severity } from "@/lib/types"
+import type { IncidentStatus, DebriefReport, Severity } from "@/lib/types"
 
 const ALL_SEVERITIES: Severity[] = ["SEV1", "SEV2", "SEV3", "SEV4"]
 
@@ -254,7 +254,7 @@ export function IncidentDetailPage() {
         </div>
 
         <div className="min-h-0 flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-          {/* Sinistra: descrizione, timeline e post-mortem */}
+          {/* Sinistra: descrizione, timeline e debriefing */}
           <div className={cn("min-h-0 space-y-4 overflow-y-auto pr-1", mobileTab !== "details" && "hidden lg:block")}>
             <Card>
               <CardHeader className="pb-2">
@@ -348,7 +348,7 @@ export function IncidentDetailPage() {
               </CardContent>
             </Card>
 
-            {incident.post_mortem && <PostMortemCard pm={incident.post_mortem} />}
+            {incident.debrief_report && <DebriefReportCard report={incident.debrief_report} />}
 
             <Card>
               <CardHeader className="pb-2">
@@ -380,14 +380,14 @@ export function IncidentDetailPage() {
   )
 }
 
-function PostMortemCard({ pm }: { pm: PostMortem }) {
+function DebriefReportCard({ report }: { report: DebriefReport }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Post-mortem</CardTitle>
+        <CardTitle className="text-base">Debriefing</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {pm.resolution && <Field label="Risoluzione" value={pm.resolution} />}
+        {report.resolution && <Field label="Risoluzione" value={report.resolution} />}
       </CardContent>
     </Card>
   )
