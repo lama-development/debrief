@@ -42,8 +42,8 @@ LANCEDB_PATH = "data/lancedb"
 
 # RAG (Retrieval-Augmented Generation)
 SIMILARITY_THRESHOLD = 0.35       # soglia minima per considerare un match "simile"
+INCIDENT_SIMILARITY_THRESHOLD = 0.55  # soglia selettiva per incidenti passati
 TOP_K_INCIDENTS = 3               # quanti risultati restituire per past_incidents
-TOP_K_VERIFIED = 3                # quanti risultati restituire per verified_solutions
 TOP_K_KB = 3                      # quanti risultati restituire per knowledge_base
 
 # LLM

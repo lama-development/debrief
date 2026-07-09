@@ -83,7 +83,7 @@ def main() -> None:
             assert {"routing", "triage", "done"} <= event_types
 
             learned = client.post(
-                f"/incidents/{incident_id}/verified-solutions",
+                f"/incidents/{incident_id}/human-solutions",
                 json={"solution": "Rigenerare e distribuire il certificato client VPN."},
                 headers=_headers(alice),
             )

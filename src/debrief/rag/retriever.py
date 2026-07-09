@@ -2,7 +2,12 @@
 
 import logging
 
-from debrief.config import SIMILARITY_THRESHOLD, TOP_K_INCIDENTS, TOP_K_KB, TOP_K_VERIFIED
+from debrief.config import (
+    INCIDENT_SIMILARITY_THRESHOLD,
+    SIMILARITY_THRESHOLD,
+    TOP_K_INCIDENTS,
+    TOP_K_KB,
+)
 from debrief.rag.indexer import get_db, search
 from debrief.tools.embedding import embed_text
 
@@ -25,7 +30,7 @@ def _retrieve(query: str, table: str, k: int, threshold: float) -> list[dict]:
 def retrieve_similar_incidents(
     query: str,
     k: int = TOP_K_INCIDENTS,
-    threshold: float = SIMILARITY_THRESHOLD,
+    threshold: float = INCIDENT_SIMILARITY_THRESHOLD,
 ) -> list[dict]:
     """Recupera incidenti passati semanticamente simili."""
     return _retrieve(query, "past_incidents", k, threshold)
@@ -38,12 +43,3 @@ def retrieve_knowledge(
 ) -> list[dict]:
     """Recupera articoli e runbook dalla knowledge base."""
     return _retrieve(query, "knowledge_base", k, threshold)
-
-
-def retrieve_verified_solutions(
-    query: str,
-    k: int = TOP_K_VERIFIED,
-    threshold: float = SIMILARITY_THRESHOLD,
-) -> list[dict]:
-    """Recupera soluzioni fornite e verificate da persone."""
-    return _retrieve(query, "verified_solutions", k, threshold)

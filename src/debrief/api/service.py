@@ -15,7 +15,6 @@ serve un refactor async.
 
 import json
 import logging
-import uuid
 from datetime import datetime, timezone
 
 # Tipi di evento che Agno emette durante lo streaming di un agente: contenuto
@@ -28,8 +27,8 @@ from debrief.agents.triage import create_triage_agent, run_triage, validate_team
 from debrief.agents.investigator import create_investigator_agent, build_investigation_prompt
 from debrief.agents.resolver import create_resolver_agent, build_resolution_prompt
 from debrief.api.lifecycle import advance_status
-from debrief.rag.indexer import get_db, add_past_incident, add_verified_solution, _build_incident_text
-from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent, TriageOutput, VerifiedSolution
+from debrief.rag.indexer import get_db, upsert_past_incident, _build_incident_text
+from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent, TriageOutput
 from debrief.tools.embedding import embed_text
 
 
@@ -329,7 +328,6 @@ def _stream_agent_prose(agent, prompt: str):
                 no_result_markers = (
                     "no similar past incidents found",
                     "no relevant knowledge base articles found",
-                    "no verified human solutions found",
                 )
                 if content and not any(marker in content for marker in no_result_markers):
                     useful_tool_results += 1
@@ -567,37 +565,30 @@ def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
     }
     # Costruiamo il testo, lo embeddiamo e lo appendiamo a 'past_incidents'.
     vector = embed_text(_build_incident_text(inc_for_index))
-    add_past_incident(get_db(), inc_for_index, vector)
+    upsert_past_incident(get_db(), inc_for_index, vector)
 
 
-def capture_verified_solution(incident_id: str, solution_text: str,
-                              provided_by: str) -> dict:
+def capture_human_solution(incident_id: str, solution_text: str,
+                           provided_by: str) -> dict:
     """Salva una soluzione umana e prova a renderla subito recuperabile dal RAG."""
     incident = db.get_incident(incident_id)
     if incident is None:
         raise ValueError(f"Incident {incident_id} not found")
-    solution = VerifiedSolution(
-        id=f"VS-{incident_id}-{uuid.uuid4().hex[:8]}",
-        incident_id=incident_id,
-        problem_context=incident["description"],
-        solution=solution_text,
-        provided_by=provided_by,
-    ).model_dump(mode="json")
-    saved = db.save_verified_solution(solution)
-    db.add_timeline_event(
+    event_id = db.add_timeline_event(
         incident_id,
         "human_solution",
         provided_by,
-        f"Soluzione verificata acquisita: {solution_text}",
+        f"Soluzione umana acquisita: {solution_text}",
     )
     try:
-        _index_verified_solution(solution)
+        _index_resolved_incident(incident, solution_text)
     except Exception:
-        logger.exception("Failed to index verified solution %s", solution["id"])
-    return saved
+        logger.exception("Failed to index human solution for incident %s", incident_id)
+    return {
+        "id": event_id,
+        "incident_id": incident_id,
+        "solution": solution_text,
+        "provided_by": provided_by,
+    }
 
 
-def _index_verified_solution(solution: dict) -> None:
-    """Indicizza in LanceDB una soluzione umana già persistita in SQLite."""
-    text = solution["problem_context"] + " " + solution["solution"]
-    add_verified_solution(get_db(), solution, embed_text(text))

@@ -74,16 +74,6 @@ class DebriefReport(BaseModel):
     resolution: str = ""
 
 
-class VerifiedSolution(BaseModel):
-    """Soluzione fornita da un umano e catturata dal resolver.
-    Indicizzata in LanceDB come fonte ad alta priorità."""
-    id: str
-    incident_id: str
-    problem_context: str
-    solution: str
-    provided_by: str
-    created_at: datetime = Field(default_factory=datetime.now)
-
 
 class ClassificationOverrideRequest(BaseModel):
     """Richiesta di override umano su severità e/o team coinvolti."""

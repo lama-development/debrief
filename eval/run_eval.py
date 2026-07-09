@@ -7,7 +7,7 @@ Esegue suite di test per le capacita' chiave del sistema:
   2. routing   - correttezza dell'Orchestrator (router LLM) nello smistare i messaggi
   3. resolver  - groundedness e provenance delle remediation
   4. retrieval - qualita' del RAG (precision/recall/MRR sui cluster di ground truth)
-  5. learning  - loop di apprendimento da soluzione umana verificata
+5. learning  - loop di apprendimento da soluzione umana
   6. injection - robustezza alla prompt injection (red-team, metrica di sicurezza)
 
 I pochi casi rappresentativi e la ground truth del retrieval stanno nell'unico
@@ -90,8 +90,6 @@ def _require_vector_tables() -> None:
     """Blocca le suite RAG con un errore chiaro se il seed non è stato eseguito."""
     from debrief.rag.indexer import get_db
 
-    # verified_solutions nasce a runtime quando arriva il primo contributo umano;
-    # non fa parte del seed iniziale.
     required = {"past_incidents", "knowledge_base"}
     available = set(get_db().list_tables().tables)
     missing = required - available
@@ -243,8 +241,7 @@ def eval_resolver() -> dict:
     _require_vector_tables()
     data = _suite_data("resolver")
     incidents = _load_json(os.path.join(SEED_DIR, "incidents.json"))
-    solutions = _load_json(os.path.join(SEED_DIR, "verified_solutions.json"))
-    valid_ids = {item["id"] for item in incidents} | {item["id"] for item in solutions}
+    valid_ids = {item["id"] for item in incidents}
     agent = create_resolver_agent()
     agent.model.temperature = 0
 
@@ -283,7 +280,7 @@ def eval_retrieval() -> dict:
     Per ogni query calcola precision@k, recall@k, MRR e hit@1, poi fa la media.
     Non usa LLM: solo embedding locali + LanceDB, quindi gira anche senza GROQ_API_KEY.
     """
-    from debrief.config import SIMILARITY_THRESHOLD
+    from debrief.config import INCIDENT_SIMILARITY_THRESHOLD
     from debrief.rag.retriever import retrieve_similar_incidents
 
     _require_vector_tables()
@@ -293,10 +290,10 @@ def eval_retrieval() -> dict:
     sum_prec = sum_rec = sum_mrr = 0.0
     hit1 = 0
     n = 0
-    print(f"\n== Suite: Retrieval (RAG, top_k={k}, soglia={SIMILARITY_THRESHOLD}) ==\n")
+    print(f"\n== Suite: Retrieval (RAG, top_k={k}, soglia={INCIDENT_SIMILARITY_THRESHOLD}) ==\n")
 
     for case in data["cases"]:
-        results = retrieve_similar_incidents(case["query"], k=k, threshold=SIMILARITY_THRESHOLD)
+        results = retrieve_similar_incidents(case["query"], k=k, threshold=INCIDENT_SIMILARITY_THRESHOLD)
         retrieved = [r["id"] for r in results]
         relevant = set(case["relevant_ids"])
 
@@ -347,42 +344,37 @@ def eval_learning_loop() -> dict:
     """Verifica che una soluzione umana diventi recuperabile dopo la cattura."""
     import tempfile
 
-    from debrief.config import SIMILARITY_THRESHOLD
-    from debrief.rag.indexer import add_verified_solution, get_db, search
+    from debrief.config import INCIDENT_SIMILARITY_THRESHOLD
+    from debrief.rag.indexer import get_db, search, upsert_past_incident, _build_incident_text
     from debrief.tools.embedding import embed_text
 
     print("\n== Suite: Learning loop ==\n")
 
     query = "FortiClient rifiuta la VPN perché il certificato client è scaduto"
     unrelated = {
-        "id": "VS-UNRELATED",
-        "incident_id": "INC-X",
-        "problem_context": "Stampante senza carta",
-        "solution": "Caricare un nuovo rotolo di etichette",
-        "provided_by": "test",
+        "id": "INC-X",
+        "title": "Stampante senza carta",
+        "severity": "SEV4",
+        "description": "Stampante etichette ferma per materiale esaurito",
+        "resolution": "Caricare un nuovo rotolo di etichette",
     }
     learned = {
-        "id": "VS-LEARNED",
-        "incident_id": "INC-Y",
-        "problem_context": query,
-        "solution": "Rigenerare e distribuire il certificato client FortiClient",
-        "provided_by": "human-expert",
+        "id": "INC-Y",
+        "title": "VPN bloccata per certificato client scaduto",
+        "severity": "SEV2",
+        "description": query,
+        "resolution": "Rigenerare e distribuire il certificato client FortiClient",
     }
 
     with tempfile.TemporaryDirectory() as directory:
         database = get_db(directory)
-        unrelated_text = unrelated["problem_context"] + " " + unrelated["solution"]
-        add_verified_solution(database, unrelated, embed_text(unrelated_text))
         query_vector = embed_text(query)
-        before = search(
-            database, "verified_solutions", query_vector, k=3,
-            threshold=SIMILARITY_THRESHOLD,
-        )
-        learned_text = learned["problem_context"] + " " + learned["solution"]
-        add_verified_solution(database, learned, embed_text(learned_text))
+        upsert_past_incident(database, unrelated, embed_text(_build_incident_text(unrelated)))
+        before = search(database, "past_incidents", query_vector, k=3, threshold=INCIDENT_SIMILARITY_THRESHOLD)
+        upsert_past_incident(database, learned, embed_text(_build_incident_text(learned)))
         after = search(
-            database, "verified_solutions", query_vector, k=3,
-            threshold=SIMILARITY_THRESHOLD,
+            database, "past_incidents", query_vector, k=3,
+            threshold=INCIDENT_SIMILARITY_THRESHOLD,
         )
 
     before_ids = {item["id"] for item in before}

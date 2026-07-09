@@ -83,12 +83,12 @@
       {
         "id": "RES-01",
         "description": "TSPlus Remote App disconnette tutti subito dopo il login, mentre HTML5 e RDP funzionano.",
-        "expected_any_ids": ["INC-003", "VS-003"]
+        "expected_any_ids": ["INC-003"]
       },
       {
         "id": "RES-02",
         "description": "La configurazione di Microsoft Authenticator è bloccata perché viene richiesto un codice MFA non ancora disponibile.",
-        "expected_any_ids": ["INC-004", "VS-004"]
+        "expected_any_ids": ["INC-004"]
       },
       {
         "id": "RES-03",

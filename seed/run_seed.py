@@ -11,9 +11,6 @@ Cosa fa:
 4. Indicizza incidenti passati e knowledge base in LanceDB
 5. Esegue un test di ricerca semantica per verificare che funzioni
 
-Le soluzioni verificate non sono dati di seed: la relativa collezione nasce
-quando un esperto fornisce il primo contributo a runtime.
-
 È uno SCRIPT, non un modulo importato dall'app: si lancia una volta sola per
 preparare il database iniziale (i dati passati su cui il RAG farà le ricerche).
 """
@@ -41,7 +38,6 @@ from debrief.rag.indexer import (
     get_db,
     index_incidents,
     index_knowledge_base,
-    index_verified_solutions,
     search,
     _build_incident_text,
 )
@@ -56,7 +52,6 @@ def main():
     # il separatore giusto del sistema operativo (\ su Windows, / su Linux/Mac).
     seed_dir = os.path.join(os.path.dirname(__file__))
     incidents_path = os.path.join(seed_dir, "incidents.json")
-    solutions_path = os.path.join(seed_dir, "verified_solutions.json")
     teams_path = os.path.join(seed_dir, "teams.json")
     kb_dir = os.path.join(seed_dir, "knowledge_base")
 
@@ -65,7 +60,7 @@ def main():
     print("[INFO] Preparing database")
     conn = get_connection()
     create_tables(conn)              # idempotente: sicuro anche se le tabelle esistono già
-    conn.execute("DELETE FROM verified_solutions")
+    conn.execute("DROP TABLE IF EXISTS verified_solutions")
     print("[OK] Tables created")
 
     # Ogni loader restituisce QUANTI record ha caricato: lo stampiamo come riscontro.
@@ -74,23 +69,6 @@ def main():
 
     n_incidents = load_incidents(conn, incidents_path)
     print(f"[OK] {n_incidents} incidents loaded")
-
-    with open(solutions_path, encoding="utf-8") as f:
-        solutions = json.load(f)
-    conn.executemany(
-        """INSERT INTO verified_solutions
-           (id, incident_id, problem_context, solution, provided_by, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        [
-            (
-                item["id"], item["incident_id"], item["problem_context"],
-                item["solution"], item["provided_by"], item["created_at"],
-            )
-            for item in solutions
-        ],
-    )
-    conn.commit()
-    print(f"[OK] {len(solutions)} verified solutions loaded")
 
     conn.close()
 
@@ -126,7 +104,7 @@ def main():
     print(
         "[OK] "
         f"{len(incidents)} incidents ({len(rag_incidents)} risolti -> RAG), "
-        f"{len(solutions)} solutions, {len(kb_docs)} runbooks ready"
+        f"{len(kb_docs)} runbooks ready"
     )
 
     # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
@@ -155,13 +133,12 @@ def main():
     # Per ogni tipo costruiamo la lista dei testi DA incorporare. Devono coincidere
     # con il testo usato in fase di ricerca (vedi indexer._build_incident_text).
     incident_texts = [_build_incident_text(inc) for inc in rag_incidents]
-    solution_texts = [item["problem_context"] + " " + item["solution"] for item in solutions]
     kb_texts = [doc["text"] for doc in kb_docs]
-    print(f"[INFO] Computing {len(incident_texts) + len(solution_texts) + len(kb_texts)} embeddings")
+    print(f"[INFO] Computing {len(incident_texts) + len(kb_texts)} embeddings")
 
     # Calcola TUTTI gli embedding in un'unica chiamata batch: molto più veloce che
     # farne una per testo. `+` tra liste le concatena in un'unica grande lista.
-    all_texts = incident_texts + solution_texts + kb_texts
+    all_texts = incident_texts + kb_texts
     all_vectors = embed_texts(all_texts)
 
     # Ora dividiamo il grande blocco di vettori nei due gruppi, nello stesso ordine
@@ -169,21 +146,21 @@ def main():
     # scorrevole `idx`. (Il `;` separa due istruzioni sulla stessa riga.)
     idx = 0
     incident_vectors = all_vectors[idx:idx + len(rag_incidents)]; idx += len(rag_incidents)
-    solution_vectors = all_vectors[idx:idx + len(solutions)]; idx += len(solutions)
     kb_vectors = all_vectors[idx:idx + len(kb_docs)]
 
     # --- 4. Indicizza in LanceDB ---
     print("\n== Indexing ==")
     print("[INFO] Writing LanceDB tables")
     db = get_db()
+    try:
+        db.drop_table("verified_solutions")
+    except Exception:
+        pass
 
     # Ogni funzione index_* crea/sovrascrive la sua collezione e restituisce il
     # numero di record indicizzati.
     n = index_incidents(db, rag_incidents, incident_vectors)
     print(f"[OK] {n} incidents indexed in 'past_incidents'")
-
-    n = index_verified_solutions(db, solutions, solution_vectors)
-    print(f"[OK] {n} solutions indexed in 'verified_solutions'")
 
     n = index_knowledge_base(db, kb_docs, kb_vectors)
     print(f"[OK] {n} runbooks indexed in 'knowledge_base'")
@@ -210,9 +187,8 @@ def main():
             for r in results:
                 similarity = 1 - r["_distance"] / 2  # distanza L2 -> coseno
                 id_field = r.get("id", "?")
-                # Prova "title"; se manca usa i primi 60 char di "problem_context"
-                # (le soluzioni verificate non hanno un titolo).
-                title_field = r.get("title", r.get("problem_context", "")[:60])
+                # Prova "title"; se manca usa i primi 60 char di "text".
+                title_field = r.get("title", r.get("text", "")[:60])
                 print(f"   [HIT] {id_field} score={similarity:.2f} {title_field}")
         else:
             print("   [MISS] No results above threshold")

@@ -5,10 +5,9 @@ LanceDB è un database VETTORIALE: invece di righe con colonne classiche, salva
 vettori (gli embedding) e sa trovare velocemente i più "vicini" a un vettore di
 query. È il motore del RAG.
 
-Gestisce le tre collezioni (tabelle):
+Gestisce le due collezioni (tabelle):
 - past_incidents: incidenti chiusi con debriefing
 - knowledge_base: runbook e documentazione
-- verified_solutions: soluzioni fornite da umani (priorità alta)
 """
 
 import os
@@ -41,20 +40,6 @@ def _incident_record(inc: dict, vec: list[float]) -> dict:
     }
 
 
-def _solution_record(sol: dict, vec: list[float]) -> dict:
-    """Costruisce il record LanceDB per una soluzione verificata.
-    Usato sia dall'indicizzazione batch (seed) sia dall'append a runtime."""
-    return {
-        "id": sol["id"],
-        "incident_id": sol.get("incident_id", ""),
-        "problem_context": sol["problem_context"],
-        "solution": sol["solution"],
-        "provided_by": sol.get("provided_by", ""),
-        "text": sol["problem_context"] + " " + sol["solution"],  # testo incorporato
-        "vector": vec,
-    }
-
-
 def index_incidents(db: lancedb.DBConnection, incidents: list[dict], vectors: list[list[float]]):
     """Indicizza gli incidenti passati in LanceDB.
 
@@ -67,7 +52,7 @@ def index_incidents(db: lancedb.DBConnection, incidents: list[dict], vectors: li
     records = [_incident_record(inc, vec) for inc, vec in zip(incidents, vectors)]
 
     # mode="overwrite" → ricrea la tabella da zero. Lo usa SOLO il seed; a runtime
-    # invece si fa .add() per APPENDERE senza cancellare (vedi add_past_incident).
+    # invece si usa upsert_past_incident per aggiornare un singolo caso.
     db.create_table("past_incidents", data=records, mode="overwrite")
     return len(records)
 
@@ -87,46 +72,21 @@ def index_knowledge_base(db: lancedb.DBConnection, docs: list[dict], vectors: li
     return len(records)
 
 
-def index_verified_solutions(
-    db: lancedb.DBConnection,
-    solutions: list[dict],
-    vectors: list[list[float]],
-) -> int:
-    """Ricrea la collezione delle soluzioni umane fornite nel seed."""
-    records = [_solution_record(solution, vector) for solution, vector in zip(solutions, vectors)]
-    db.create_table("verified_solutions", data=records, mode="overwrite")
-    return len(records)
+def upsert_past_incident(db: lancedb.DBConnection, incident: dict, vector: list[float]) -> str:
+    """Inserisce o aggiorna un incidente in 'past_incidents'.
 
-
-def add_past_incident(db: lancedb.DBConnection, incident: dict, vector: list[float]) -> str:
-    """Aggiunge UN incidente risolto a 'past_incidents' (append, non overwrite).
-    È il cuore del loop di apprendimento: ogni incidente chiuso diventa
-    immediatamente ricercabile dall'investigator e dal resolver.
-    Crea la tabella se non esiste ancora (DB senza seed)."""
+    Il loop di apprendimento puo' indicizzare lo stesso incidente quando arriva
+    una soluzione umana e poi di nuovo alla chiusura. Rimuovere prima il record
+    esistente evita duplicati nei risultati RAG.
+    """
     record = _incident_record(incident, vector)
     try:
-        # open_table fallisce con ValueError se la tabella non esiste ancora.
         table = db.open_table("past_incidents")
     except ValueError:
-        # Primo incidente su un DB mai seedato: creiamo la tabella con questo record.
         db.create_table("past_incidents", data=[record])
         return record["id"]
-    # .add() appende il nuovo record SENZA toccare quelli esistenti.
-    table.add([record])
-    return record["id"]
-
-
-def add_verified_solution(db: lancedb.DBConnection, solution: dict, vector: list[float]) -> str:
-    """Aggiunge UNA soluzione verificata da umano a 'verified_solutions' (append).
-    Metà human-feedback del loop di apprendimento: quando una persona fornisce
-    una soluzione, diventa una fonte ad alta priorità per i casi futuri.
-    Crea la tabella se non esiste ancora."""
-    record = _solution_record(solution, vector)
-    try:
-        table = db.open_table("verified_solutions")
-    except ValueError:
-        db.create_table("verified_solutions", data=[record])  # tabella assente (DB senza seed)
-        return record["id"]
+    safe_id = record["id"].replace("'", "''")
+    table.delete(f"id = '{safe_id}'")
     table.add([record])
     return record["id"]
 
@@ -136,7 +96,7 @@ def search(db: lancedb.DBConnection, table_name: str, query_vector: list[float],
     """Cerca i record più simili in una tabella LanceDB.
 
     Args:
-        table_name: "past_incidents", "knowledge_base", o "verified_solutions"
+        table_name: "past_incidents" o "knowledge_base"
         query_vector: il vettore della query
         k: numero massimo di risultati
         threshold: soglia minima di similarità (0-1, coseno). Sotto questa, il risultato viene scartato.
@@ -173,6 +133,7 @@ def _build_incident_text(incident: dict) -> str:
     """Costruisce il testo da incorporare per un incidente.
     Combina descrizione e risoluzione per massimizzare il retrieval."""
     parts = [
+        incident.get("title", ""),
         incident.get("description", ""),
         incident.get("resolution", ""),
     ]

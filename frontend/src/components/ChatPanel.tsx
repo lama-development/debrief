@@ -400,9 +400,9 @@ function HumanHelpCard({
     if (solution.trim().length < 3) return
     setSaving(true)
     try {
-      await incidentsApi.addVerifiedSolution(incidentId, solution.trim())
+      await incidentsApi.addHumanSolution(incidentId, solution.trim())
       setSaved(true)
-      toast.success("Soluzione acquisita come conoscenza verificata")
+      toast.success("Soluzione acquisita nell'incidente")
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Salvataggio fallito")
     } finally {
@@ -425,7 +425,7 @@ function HumanHelpCard({
           <Textarea
             value={solution}
             onChange={(event) => setSolution(event.target.value)}
-            placeholder="Descrivi la soluzione verificata dall'esperto…"
+            placeholder="Descrivi la soluzione trovata dall'esperto..."
             rows={3}
           />
           <Button

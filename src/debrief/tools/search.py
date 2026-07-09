@@ -14,7 +14,6 @@ Ogni funzione restituisce una STRINGA leggibile che l'agente usa nella sua rispo
 from debrief.rag.retriever import (
     retrieve_knowledge,
     retrieve_similar_incidents,
-    retrieve_verified_solutions,
 )
 
 
@@ -27,8 +26,9 @@ def search_past_incidents(query: str) -> str:
         query: Description of symptoms, error messages, or the situation to search for.
 
     Returns:
-        A formatted list of similar past incidents with their details, or a message
-        saying no similar incidents were found.
+        Up to three past incidents above the similarity threshold. If only one
+        incident is truly similar, only one is returned. Never assume the list
+        must be filled to three results.
     """
     # 1. Trasforma la query in vettore. 2. Apre il DB vettoriale. 3. Cerca i k più
     # simili sopra la soglia.
@@ -41,7 +41,10 @@ def search_past_incidents(query: str) -> str:
 
     # Costruiamo la risposta come lista di pezzi di testo, poi li uniamo. Più
     # efficiente che concatenare stringhe in un loop.
-    output_parts = [f"Found {len(results)} similar past incident(s):\n"]
+    output_parts = [
+        f"Found {len(results)} past incident(s) above the similarity threshold. "
+        "Do not treat this as a mandatory top-3 list; cite only the incidents that are actually useful.\n"
+    ]
     for r in results:
         # _distance è la distanza L2 restituita da LanceDB; con vettori normalizzati
         # similarità coseno = 1 - distanza/2. (Vedi spiegazione in indexer.search.)
@@ -89,30 +92,3 @@ def search_knowledge_base(query: str) -> str:
     return "\n".join(output_parts)
 
 
-def search_verified_solutions(query: str) -> str:
-    """Search for human-verified solutions to past problems.
-    These are solutions that were provided by human experts when the system
-    couldn't solve a problem autonomously. They have the highest reliability.
-
-    Args:
-        query: Description of the problem to find verified solutions for.
-
-    Returns:
-        Verified solutions with their context, or a message saying none were found.
-    """
-    results = retrieve_verified_solutions(query)
-
-    if not results:
-        return "No verified human solutions found for this type of problem."
-
-    output_parts = [f"Found {len(results)} verified solution(s):\n"]
-    for r in results:
-        similarity = r["similarity"]
-        output_parts.append(
-            f"--- Solution {r['id']} (relevance: {similarity:.0%}) ---\n"
-            f"Problem context: {r.get('problem_context', 'N/A')}\n"
-            f"Solution: {r.get('solution', 'N/A')}\n"
-            f"Provided by: {r.get('provided_by', 'N/A')}\n"
-        )
-
-    return "\n".join(output_parts)

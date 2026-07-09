@@ -109,16 +109,6 @@ def create_tables(conn: sqlite3.Connection):
             created_at  TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (incident_id) REFERENCES incidents(id)
         );
-
-        CREATE TABLE IF NOT EXISTS verified_solutions (
-            id              TEXT PRIMARY KEY,
-            incident_id     TEXT NOT NULL,
-            problem_context TEXT NOT NULL,
-            solution        TEXT NOT NULL,
-            provided_by     TEXT NOT NULL,
-            created_at      TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (incident_id) REFERENCES incidents(id)
-        );
     """)
     # SQLite richiede commit() per rendere PERMANENTI le modifiche sul file.
     conn.commit()
@@ -453,51 +443,6 @@ def get_debrief_report(incident_id: str, db_path: str | None = None) -> dict | N
         ).fetchone()
         # json.loads = da testo JSON a dict Python. Lo facciamo solo se row esiste.
         return json.loads(row["content_json"]) if row else None
-    finally:
-        conn.close()
-
-
-def save_verified_solution(solution: dict, db_path: str | None = None) -> dict:
-    """Persiste una soluzione umana prima della sua indicizzazione vettoriale."""
-    conn = get_connection(db_path)
-    try:
-        conn.execute(
-            """INSERT INTO verified_solutions
-               (id, incident_id, problem_context, solution, provided_by)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
-                solution["id"],
-                solution["incident_id"],
-                solution["problem_context"],
-                solution["solution"],
-                solution["provided_by"],
-            ),
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT * FROM verified_solutions WHERE id = ?", (solution["id"],)
-        ).fetchone()
-        assert row is not None
-        return dict(row)
-    finally:
-        conn.close()
-
-
-def list_verified_solutions(incident_id: str | None = None,
-                            db_path: str | None = None) -> list[dict]:
-    """Elenca la conoscenza umana catturata, opzionalmente per incidente."""
-    conn = get_connection(db_path)
-    try:
-        if incident_id:
-            rows = conn.execute(
-                "SELECT * FROM verified_solutions WHERE incident_id = ? ORDER BY created_at",
-                (incident_id,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM verified_solutions ORDER BY created_at"
-            ).fetchall()
-        return [dict(row) for row in rows]
     finally:
         conn.close()
 

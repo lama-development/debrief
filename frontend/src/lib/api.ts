@@ -132,8 +132,8 @@ export const incidentsApi = {
   reopen: (id: string) => request<Incident>(`/incidents/${id}/reopen`, { method: "POST" }),
   patchClassification: (id: string, body: ClassificationOverrideRequest) =>
     request<Incident>(`/incidents/${id}/classification`, { method: "PATCH", body }),
-  addVerifiedSolution: (id: string, solution: string) =>
-    request(`/incidents/${id}/verified-solutions`, {
+  addHumanSolution: (id: string, solution: string) =>
+    request(`/incidents/${id}/human-solutions`, {
       method: "POST",
       body: { solution },
     }),

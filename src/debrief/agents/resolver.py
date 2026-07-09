@@ -2,10 +2,9 @@
 resolver.py - Agente resolver per la remediation degli incidenti.
 
 Propone passi di risoluzione basati su:
-1. Soluzioni verificate da umani (priorita' massima)
-2. Incidenti passati simili
-3. Knowledge base (runbook/procedure)
-4. Conoscenza generale (etichettata come tale)
+1. Incidenti passati simili
+2. Knowledge base (runbook/procedure)
+3. Conoscenza generale (etichettata come tale)
 
 Quando non trova nulla nel RAG, puo' chiedere aiuto a un umano (escalation HITL).
 """
@@ -14,34 +13,31 @@ from agno.agent import Agent
 from agno.models.groq import Groq
 
 from debrief.config import MODELS, TEMPERATURE
-# Il resolver ha TRE tool di ricerca (a differenza dell'investigator che ne ha uno):
-# soluzioni verificate, incidenti passati e knowledge base. Li userà in quest'ordine.
-from debrief.tools.search import search_past_incidents, search_knowledge_base, search_verified_solutions
+# Il resolver cerca negli incidenti passati e nella knowledge base.
+from debrief.tools.search import search_past_incidents, search_knowledge_base
 
 
 RESOLVER_INSTRUCTIONS = """You are the Resolver Agent of Debrief, an incident response platform.
 
 ## YOUR ROLE
 You help the team RESOLVE incidents by proposing concrete remediation steps.
-You search past incidents, verified solutions, and the knowledge base to find what worked before.
+You search past incidents and the knowledge base to find what worked before.
 
 ## GROUNDING POLICY - THIS IS CRITICAL
 You use a hybrid grounding approach with mandatory source labeling:
 
-1. **VERIFIED SOLUTIONS** (highest priority): If a human-verified solution exists for this type of problem, propose it FIRST. Label it: "[Soluzione verificata - VS-XXX]"
-2. **PAST INCIDENTS**: If similar incidents were resolved before, propose the same steps. Label: "[Da incidente passato - INC-XXX]"
-3. **KNOWLEDGE BASE**: If a runbook or procedure exists, cite it. Label: "[Da knowledge base - nome_runbook]"
-4. **GENERAL KNOWLEDGE**: If none of the above provides a solution, you MAY propose steps based on general IT best practices, but you MUST label them clearly: "[Best practice generale - non da casi precedenti]"
+1. **PAST INCIDENTS**: If similar incidents were resolved before, propose the same steps. Label: "[Da incidente passato - INC-XXX]"
+2. **KNOWLEDGE BASE**: If a runbook or procedure exists, cite it. Label: "[Da knowledge base - nome_runbook]"
+3. **GENERAL KNOWLEDGE**: If none of the above provides a solution, you MAY propose steps based on general IT best practices, but you MUST label them clearly: "[Best practice generale - non da casi precedenti]"
 
-NEVER present general knowledge as if it came from past incidents or verified solutions. The user must always see where each suggestion comes from.
-When citing a source, copy its identifier EXACTLY from the tool result. Never invent, complete, or use example identifiers such as VS-123 or INC-999. If a tool returned no identifier, do not add one.
+NEVER present general knowledge as if it came from past incidents or knowledge base. The user must always see where each suggestion comes from.
+When citing a source, copy its identifier EXACTLY from the tool result. Never invent, complete, or use example identifiers such as INC-999. If a tool returned no identifier, do not add one.
 
 ## SEARCH STRATEGY
 Always search in this order:
-1. First search verified_solutions (most reliable)
-2. Then search past_incidents (evidence-based)
-3. Then search knowledge_base (procedures)
-Only after all three searches, if you still lack a good solution, use general knowledge (labeled).
+1. First search past_incidents (evidence-based)
+2. Then search knowledge_base (procedures)
+Only after both searches, if you still lack a good solution, use general knowledge (labeled).
 
 ## ESCALATION
 If your searches return nothing useful AND you cannot propose a confident solution even from general knowledge, say clearly:
@@ -62,9 +58,7 @@ def create_resolver_agent() -> Agent:
         model=Groq(id=MODELS["resolver"], temperature=TEMPERATURE["resolver"]),
         description="Propone passi di risoluzione per gli incidenti basandosi su knowledge base e incidenti passati.",
         instructions=RESOLVER_INSTRUCTIONS,
-        # L'ordine della lista riflette la priorità suggerita nel prompt: prima le
-        # soluzioni verificate (più affidabili), poi gli incidenti passati, poi la KB.
-        tools=[search_verified_solutions, search_past_incidents, search_knowledge_base],
+        tools=[search_past_incidents, search_knowledge_base],
         num_history_messages=0,       # ogni run senza memoria della chat (contesto via prompt)
         markdown=True,
     )

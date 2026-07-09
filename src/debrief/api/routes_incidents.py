@@ -86,15 +86,15 @@ def reopen(incident_id: str, user: dict = Depends(auth.current_user)):
         raise HTTPException(status_code=409, detail=str(e))
 
 
-@router.post("/{incident_id}/verified-solutions", status_code=201)
-def add_verified_solution(
+@router.post("/{incident_id}/human-solutions", status_code=201)
+def add_human_solution(
     incident_id: str,
     body: HumanSolutionRequest,
     user: dict = Depends(auth.current_user),
 ):
     """Cattura un contributo umano e lo rende riutilizzabile dal RAG."""
     _require_incident(incident_id, user["id"])
-    return service.capture_verified_solution(incident_id, body.solution, user["username"])
+    return service.capture_human_solution(incident_id, body.solution, user["username"])
 
 
 @router.patch("/{incident_id}/classification")
