@@ -387,18 +387,9 @@ function DebriefReportCard({ report }: { report: DebriefReport }) {
         <CardTitle className="text-base">Debriefing</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {report.resolution && <Field label="Risoluzione" value={report.resolution} />}
+        {report.resolution}
       </CardContent>
     </Card>
-  )
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-sm font-medium text-muted-foreground">{label}</div>
-      <p className="whitespace-pre-wrap">{value}</p>
-    </div>
   )
 }
 
