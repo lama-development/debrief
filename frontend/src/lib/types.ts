@@ -37,7 +37,7 @@ export interface TimelineEvent {
   id: number;
   incident_id: string;
   timestamp: string;
-  // "message" | "triage" | "escalation" | "resolution" | "involvement"
+  // "message" | "triage" | "escalation" | "resolution" | "reopen" | "involvement"
   event_type: string;
   actor: string | null;
   actor_username: string | null;

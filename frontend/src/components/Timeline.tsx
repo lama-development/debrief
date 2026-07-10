@@ -11,6 +11,7 @@ import {
 import { formatDateTime } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { AGENT_IDENTITY } from "@/lib/agents";
+import { useTeams } from "@/hooks/useTeams";
 import type { TimelineEvent } from "@/lib/types";
 
 const BOT_ACTORS = new Set(["triage", "investigator", "resolver", "debrief"]);
@@ -37,15 +38,11 @@ interface Milestone {
 // Traduce gli eventi grezzi di timeline nei soli milestone, scartando la
 // conversazione (message + prosa degli agenti). La chat mostra il dialogo;
 // qui resta la cronologia "ufficiale" dei fatti con data e ora.
-function toMilestones(events: TimelineEvent[]): Milestone[] {
+function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => string): Milestone[] {
   const out: Milestone[] = [];
-
-  // Team assegnati dal triage: aggregati in un'unica riga invece di N milestone separati.
-  const triageTeams = events
-    .filter((ev) => ev.event_type === "involvement" && ev.actor === "triage")
-    .map((ev) => ev.content ?? "")
-    .filter(Boolean)
-    .join(", ");
+  // Gli involvement del triage precedono il relativo evento "triage" nel DB.
+  // Li accumuliamo per singolo passaggio e li azzeriamo dopo ogni classificazione.
+  const pendingTriageTeams = new Set<string>();
 
   events.forEach((ev, idx) => {
     // Il primo evento in assoluto è il messaggio di dichiarazione dell'incidente.
@@ -60,19 +57,25 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
       return;
     }
     switch (ev.event_type) {
+      case "involvement":
+        if (ev.actor === "triage" && ev.content) pendingTriageTeams.add(ev.content);
+        break;
       case "triage":
         out.push({
           key: `${ev.id}`,
           time: ev.timestamp,
           label: "Classificato dal triage",
-          detail: triageTeams || undefined,
+          detail:
+            pendingTriageTeams.size > 0
+              ? [...pendingTriageTeams].map(teamName).join(", ")
+              : undefined,
           icon: ClipboardCheck,
           cls: actorCls(ev.actor),
         });
+        pendingTriageTeams.clear();
         break;
       // involvement e disinvolvement individuali: il triage li aggrega sopra,
       // quelli umani sono già riassunti nell'evento "override".
-      case "involvement":
       case "disinvolvement":
         break;
       case "override": {
@@ -82,9 +85,10 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           const parts: string[] = [];
           if (parsed.after?.severity && parsed.after.severity !== parsed.before?.severity)
             parts.push(`Severità: ${parsed.before?.severity ?? "—"} → ${parsed.after.severity}`);
-          if (parsed.after?.add_teams?.length) parts.push(`+${parsed.after.add_teams.join(", ")}`);
+          if (parsed.after?.add_teams?.length)
+            parts.push(`+${parsed.after.add_teams.map(teamName).join(", ")}`);
           if (parsed.after?.remove_teams?.length)
-            parts.push(`-${parsed.after.remove_teams.join(", ")}`);
+            parts.push(`-${parsed.after.remove_teams.map(teamName).join(", ")}`);
           if (parsed.reason) parts.push(`motivo: ${parsed.reason}`);
           detail = parts.join(" · ") || undefined;
         } catch {
@@ -145,7 +149,8 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
 }
 
 export function Timeline({ events }: { events: TimelineEvent[] }) {
-  const milestones = toMilestones(events);
+  const { teamName } = useTeams();
+  const milestones = toMilestones(events, teamName);
 
   if (milestones.length === 0) {
     return (

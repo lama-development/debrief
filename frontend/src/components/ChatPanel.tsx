@@ -28,6 +28,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   agent?: string;
   content: string;
+  timestamp: string;
   senderId?: string;
   senderUsername?: string;
   senderTeam?: string;
@@ -45,7 +46,9 @@ const CLOSED_STATUSES: IncidentStatus[] = ["resolved"];
 const INCIDENT_REFERENCE_RE = /\bINC[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212](\d{3,})\b/g;
 const EXISTING_INCIDENT_LINK_RE = /(\[INC-\d{3,}\]\([^)]+\))/g;
 const CODE_FENCE_OR_INLINE_RE = /(```[\s\S]*?```|`[^`\n]+`)/g;
-const DEBRIEF_MENTION_RE = /(^|\s)@debrief\b/i;
+// Allineata al backend: la mention può seguire spazi o punteggiatura, ma non
+// deve essere parte di un indirizzo/email o di una doppia @.
+const DEBRIEF_MENTION_RE = /(^|[^\w@])@debrief\b/i;
 
 function mentionAtCursor(value: string, cursor: number) {
   const match = value.slice(0, cursor).match(/(^|\s)@([a-zA-Z0-9_-]*)$/);
@@ -69,6 +72,19 @@ function renderHumanMessage(content: string) {
       part
     ),
   );
+}
+
+function formatMessageTime(timestamp: string) {
+  const iso = timestamp.includes("T") ? timestamp : timestamp.replace(" ", "T") + "Z";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function linkIncidentReferences(markdown: string) {
@@ -108,6 +124,7 @@ function seedMessages(events: TimelineEvent[]): ChatMessage[] {
       id: ev.id,
       role: isAssistant ? "assistant" : "user",
       agent: isAssistant ? (ev.actor ?? undefined) : undefined,
+      timestamp: ev.timestamp,
       senderId: isAssistant ? undefined : (ev.actor ?? undefined),
       senderUsername: isAssistant ? undefined : (ev.actor_username ?? ev.actor ?? "Utente"),
       senderTeam: isAssistant ? undefined : (ev.actor_team_name ?? undefined),
@@ -192,12 +209,13 @@ export function ChatPanel({
   // textArg valorizzato = invio automatico (es. auto-triage); undefined = dall'input utente.
   async function send(textArg?: string) {
     const text = (textArg ?? input).trim();
-    if (!text || streaming) return;
+    if (!text || streaming) return false;
 
     const userMsg: ChatMessage = {
       id: nextLocalId.current--,
       role: "user",
       content: text,
+      timestamp: new Date().toISOString(),
       senderId: user?.id,
       senderUsername: user?.username,
       senderTeam: user?.team_name,
@@ -210,7 +228,14 @@ export function ChatPanel({
       userMsg,
       ...(assistantId === null
         ? []
-        : [{ id: assistantId, role: "assistant" as const, content: "" }]),
+        : [
+            {
+              id: assistantId,
+              role: "assistant" as const,
+              content: "",
+              timestamp: new Date().toISOString(),
+            },
+          ]),
     ]);
     if (textArg === undefined) setInput("");
     setStreaming(true);
@@ -219,26 +244,51 @@ export function ChatPanel({
 
     // Legge sempre activeAssistantId.current: si aggiorna automaticamente quando
     // arriva un evento "phase" che crea una nuova bolla per l'agente successivo.
-    const patchAssistant = (patch: Partial<ChatMessage>) =>
+    const patchAssistant = (patch: Partial<ChatMessage>) => {
+      // Cattura ora l'ID: React può applicare questo updater dopo che lo stream
+      // ha già cambiato o azzerato activeAssistantId.current.
+      const assistantId = activeAssistantId.current;
+      if (assistantId === null) return;
       setMessages((prev) =>
         prev.map((m) =>
-          activeAssistantId.current !== null && m.id === activeAssistantId.current
+          m.id === assistantId
             ? { ...m, ...patch, content: patch.content ?? m.content }
             : m,
         ),
       );
-    const appendToken = (token: string) =>
+    };
+    const appendToken = (token: string) => {
+      // Stessa garanzia di patchAssistant per token, fallback e domande del triage.
+      const assistantId = activeAssistantId.current;
+      if (assistantId === null) return;
       setMessages((prev) =>
-        prev.map((m) =>
-          activeAssistantId.current !== null && m.id === activeAssistantId.current
-            ? { ...m, content: m.content + token }
-            : m,
-        ),
+        prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
       );
+    };
 
+    // Il backend è la fonte di verità sull'attivazione di Debrief. Se riceviamo
+    // un evento di routing senza aver previsto una bubble (per esempio per una
+    // variante di mention non riconosciuta localmente), la creiamo al volo.
+    const ensureAssistant = () => {
+      if (activeAssistantId.current !== null) return;
+      const newId = nextLocalId.current--;
+      activeAssistantId.current = newId;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    };
+
+    let streamFailed = false;
     const onEvent = (ev: ChatEvent) => {
       switch (ev.type) {
         case "routing":
+          ensureAssistant();
           patchAssistant({ agent: ev.agent === "none" ? "debrief" : ev.agent });
           setActiveAgent(ev.agent === "none" ? "debrief" : ev.agent);
           break;
@@ -261,7 +311,13 @@ export function ChatPanel({
           setActiveAgent(ev.agent);
           setMessages((prev) => [
             ...prev,
-            { id: newId, role: "assistant", content: "", agent: ev.agent },
+            {
+              id: newId,
+              role: "assistant",
+              content: "",
+              agent: ev.agent,
+              timestamp: new Date().toISOString(),
+            },
           ]);
           break;
         }
@@ -274,6 +330,7 @@ export function ChatPanel({
           onTurnComplete();
           break;
         case "error":
+          streamFailed = true;
           toast.error(ev.message);
           appendToken(`\n\n[errore: ${ev.message}]`);
           break;
@@ -282,9 +339,11 @@ export function ChatPanel({
 
     try {
       await streamChat(incidentId, text, onEvent);
+      return !streamFailed;
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Errore durante la chat");
       patchAssistant({ content: "Si è verificato un errore. Riprova." });
+      return false;
     } finally {
       const emptyAssistantId = activeAssistantId.current;
       if (emptyAssistantId !== null) {
@@ -356,6 +415,8 @@ export function ChatPanel({
             onOverrideConfirm={handleOverrideConfirm}
             overridePending={overridePending}
             currentUserId={user?.id}
+            clarificationsDisabled={streaming}
+            onClarificationsSubmit={send}
           />
         ))}
         {activeTool && <ToolBubble agent={activeAgent} />}
@@ -470,19 +531,33 @@ function MessageBubble({
   message,
   incidentId,
   onOverrideConfirm,
+  onClarificationsSubmit,
   overridePending,
+  clarificationsDisabled,
   currentUserId,
 }: {
   message: ChatMessage;
   incidentId: string;
   onOverrideConfirm: (msgId: number) => void;
+  onClarificationsSubmit: (message: string) => Promise<boolean>;
   overridePending: boolean;
+  clarificationsDisabled: boolean;
   currentUserId?: string;
 }) {
   const [dismissed, setDismissed] = useState(message.overrideDismissed ?? false);
   const isUser = message.role === "user";
   const isOwn = isUser && message.senderId === currentUserId;
   const identity = getAgentIdentity(message.agent);
+  const hasVisibleBubble = Boolean(
+    message.content ||
+      message.triage ||
+      (!dismissed && message.overrideProposal) ||
+      message.humanHelp,
+  );
+  const hasGuidedClarifications = Boolean(
+    message.triage?.needs_clarification &&
+      message.triage.clarifying_questions.some((question) => question.trim().length > 0),
+  );
   return (
     <div className={cn("flex gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
       <span
@@ -513,7 +588,13 @@ function MessageBubble({
             </span>
           </div>
         )}
-        {message.triage && <TriageCard data={message.triage} />}
+        {message.triage && (
+          <TriageCard
+            data={message.triage}
+            disabled={clarificationsDisabled}
+            onSubmitClarifications={onClarificationsSubmit}
+          />
+        )}
         {message.overrideProposal && !dismissed && (
           <OverrideConfirmCard
             proposal={message.overrideProposal}
@@ -523,7 +604,7 @@ function MessageBubble({
           />
         )}
         {message.humanHelp && <HumanHelpCard incidentId={incidentId} request={message.humanHelp} />}
-        {message.content && (
+        {message.content && !hasGuidedClarifications && (
           <div
             className={cn(
               "inline-block rounded-2xl px-3 py-2 text-sm shadow-sm",
@@ -569,6 +650,16 @@ function MessageBubble({
                 </ReactMarkdown>
               </div>
             )}
+          </div>
+        )}
+        {hasVisibleBubble && (
+          <div
+            className={cn(
+              "px-1 text-[10px] leading-none text-muted-foreground/70",
+              isOwn && "text-right",
+            )}
+          >
+            {formatMessageTime(message.timestamp)}
           </div>
         )}
       </div>

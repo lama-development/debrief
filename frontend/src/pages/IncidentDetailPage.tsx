@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels";
 import { useIncident, useReopenIncident } from "@/hooks/useIncident";
+import { useTeams } from "@/hooks/useTeams";
 import { useUpdateClassification } from "@/hooks/useUpdateClassification";
 import { ApiError } from "@/lib/api";
 import type { IncidentStatus, DebriefReport, Severity } from "@/lib/types";
@@ -54,23 +55,13 @@ function SeverityDropdown({
   );
 }
 
-// Team catalog mirrored from seed/teams.json — IDs stabili, non cambiano a runtime.
-const ALL_TEAMS: { id: string; label: string }[] = [
-  { id: "IT_INTERNAL", label: "IT Interno" },
-  { id: "IT_DEV", label: "Sviluppatori Genius" },
-  { id: "IT_EXTERNAL", label: "2000net Srl" },
-  { id: "PLC_VENDOR", label: "Fornitore PLC" },
-  { id: "PRODUCTION", label: "Reparto Produzione" },
-  { id: "LAB", label: "Laboratorio" },
-  { id: "MANAGEMENT", label: "Direzione" },
-];
-
 const RESOLVABLE: IncidentStatus[] = ["open", "active"];
 
 export function IncidentDetailPage() {
   const { id = "" } = useParams();
   const qc = useQueryClient();
   const { data: incident, isLoading, isError } = useIncident(id);
+  const { teams, teamName } = useTeams();
   const reopen = useReopenIncident(id);
   const updateClass = useUpdateClassification(id);
   const [mobileTab, setMobileTab] = useState<"chat" | "details">("chat");
@@ -285,7 +276,7 @@ export function IncidentDetailPage() {
               <CardContent>
                 <div className="flex flex-wrap gap-1.5">
                   {incident.involved_teams.map((teamId) => {
-                    const label = ALL_TEAMS.find((t) => t.id === teamId)?.label ?? teamId;
+                    const label = teamName(teamId);
                     return (
                       <span
                         key={teamId}
@@ -319,7 +310,7 @@ export function IncidentDetailPage() {
                           Aggiungi
                         </button>
                       ) : (
-                        ALL_TEAMS.filter((t) => !incident.involved_teams.includes(t.id)).map(
+                        teams.filter((t) => !incident.involved_teams.includes(t.id)).map(
                           (t) => (
                             <button
                               key={t.id}
@@ -329,7 +320,7 @@ export function IncidentDetailPage() {
                               className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
                             >
                               <Plus className="h-3 w-3" />
-                              {t.label}
+                              {t.name}
                             </button>
                           ),
                         )

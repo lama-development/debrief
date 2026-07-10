@@ -2,17 +2,8 @@ import { CheckCircle, XCircle } from "lucide-react";
 
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { Button } from "@/components/ui/button";
+import { useTeams } from "@/hooks/useTeams";
 import type { OverrideProposal } from "@/lib/types";
-
-const TEAM_LABELS: Record<string, string> = {
-  IT_INTERNAL: "IT Interno",
-  IT_DEV: "Sviluppatori Genius",
-  IT_EXTERNAL: "2000net Srl",
-  PLC_VENDOR: "Fornitore PLC",
-  PRODUCTION: "Reparto Produzione",
-  LAB: "Laboratorio",
-  MANAGEMENT: "Direzione",
-};
 
 export function OverrideConfirmCard({
   proposal,
@@ -25,6 +16,7 @@ export function OverrideConfirmCard({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const { teamName } = useTeams();
   const hasChanges =
     proposal.severity !== null || proposal.add_teams.length > 0 || proposal.remove_teams.length > 0;
 
@@ -50,7 +42,7 @@ export function OverrideConfirmCard({
               <div className="flex flex-wrap gap-1">
                 {proposal.add_teams.map((t) => (
                   <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-                    {TEAM_LABELS[t] ?? t}
+                    {teamName(t)}
                   </span>
                 ))}
               </div>
@@ -67,7 +59,7 @@ export function OverrideConfirmCard({
                     key={t}
                     className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium line-through opacity-60"
                   >
-                    {TEAM_LABELS[t] ?? t}
+                    {teamName(t)}
                   </span>
                 ))}
               </div>
