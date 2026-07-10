@@ -83,7 +83,7 @@ def reopen(incident_id: str, user: dict = Depends(auth.current_user)):
     """Riapre un incidente risolto (torna 'active')."""
     _require_incident(incident_id, user["id"])
     try:
-        return service.reopen_incident(incident_id)
+        return service.reopen_incident(incident_id, user["username"])
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 

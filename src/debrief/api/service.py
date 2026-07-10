@@ -15,6 +15,7 @@ serve un refactor async.
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 
 # Tipi di evento che Agno emette durante lo streaming di un agente: contenuto
@@ -28,11 +29,18 @@ from debrief.agents.investigator import create_investigator_agent, build_investi
 from debrief.agents.resolver import create_resolver_agent, build_resolution_prompt
 from debrief.api.lifecycle import advance_status
 from debrief.rag.indexer import get_db, upsert_past_incident, _build_incident_text
-from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent, TriageOutput
+from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent
 from debrief.tools.embedding import embed_text
 
 
 logger = logging.getLogger(__name__)
+
+DEBRIEF_MENTION_RE = re.compile(r"(?<![\w@])@debrief\b", re.IGNORECASE)
+DEBRIEF_HELP_TEXT = (
+    "Mi spiace, non posso aiutarti con questa richiesta. Però sono qui per darti "
+    "una mano con l'incidente: posso cercare casi simili, analizzare le possibili "
+    "cause o suggerirti come intervenire."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +105,15 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         # 1. Persisti il messaggio dell'utente in timeline.
         db.add_timeline_event(incident_id, "message", user_id, message)
 
+        # I messaggi della chat appartengono prima di tutto al team. Dopo il triage
+        # iniziale Debrief interviene solo quando viene menzionato esplicitamente.
+        # Finché l'incidente è "open", invece, ogni risposta completa il normale
+        # ciclo di chiarimenti del triage senza obbligare l'utente a ripetere la mention.
+        bot_requested = status == "open" or DEBRIEF_MENTION_RE.search(message) is not None
+        if not bot_requested:
+            yield {"type": "done", "status": status, "incident_id": incident_id}
+            return
+
         # 2. Routing (bloccante, veloce: piccola decisione JSON). Emettiamo subito
         #    un evento "routing" così la UI può mostrare "sto pensando con X".
         router = create_router_agent()
@@ -105,34 +122,9 @@ def stream_chat(incident_id: str, message: str, user_id: str):
 
         # 3-4. Esegui l'agente scelto.
         if decision.agent == AgentRole.TRIAGE:
-            event_name, triage_result = yield from _stream_triage(
+            event_name, _ = yield from _stream_triage(
                 incident_id, message, description, conversation_context
             )
-
-            # Pipeline automatica: dopo una classificazione riuscita, catena
-            # immediatamente investigator e resolver senza aspettare input utente.
-            if event_name == "TRIAGE_CLASSIFIED" and triage_result is not None:
-                triage_ctx = _format_triage_context(triage_result)
-
-                yield {"type": "phase", "agent": "investigator"}
-                investigation_summary = yield from _stream_investigator(
-                    incident_id,
-                    "Cerca incidenti simili e identifica possibili cause radice.",
-                    description,
-                    triage_context=triage_ctx,
-                    conversation_context=conversation_context,
-                )
-
-                yield {"type": "phase", "agent": "resolver"}
-                yield from _stream_resolver(
-                    incident_id,
-                    "",
-                    description,
-                    triage_context=triage_ctx,
-                    investigation_summary=investigation_summary or "",
-                    conversation_context=conversation_context,
-                )
-                event_name = "RESOLUTION_STARTED"
 
         elif decision.agent == AgentRole.INVESTIGATOR:
             yield from _stream_investigator(
@@ -148,7 +140,9 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         elif decision.agent == AgentRole.OVERRIDE:
             yield from _stream_override(decision)
             event_name = None
-        else:  # AgentRole.NONE → nessun agente da eseguire
+        else:  # Mention valida, ma nessun agente specialistico necessario.
+            yield {"type": "token", "content": DEBRIEF_HELP_TEXT}
+            db.add_timeline_event(incident_id, "message", "debrief", DEBRIEF_HELP_TEXT)
             event_name = None
 
         # 5. Applica l'eventuale transizione di stato (solo eventi automatici dalla chat).
@@ -278,16 +272,6 @@ def _stream_override(decision: RoutingDecision):
             "description": params.description or decision.reason,
         },
     }
-
-
-def _format_triage_context(triage: TriageOutput) -> str:
-    teams = ", ".join(triage.suggested_teams) if triage.suggested_teams else "nessuno"
-    return (
-        f"Titolo: {triage.title}\n"
-        f"Severità: {triage.severity.value}\n"
-        f"Team suggeriti: {teams}\n"
-        f"Sommario: {triage.summary}"
-    )
 
 
 def _conversation_context(incident_id: str, limit: int = 12) -> str:
@@ -482,11 +466,11 @@ def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str
 
 
 # reopen_incident delega alla logica generica di transizione esplicita.
-def reopen_incident(incident_id: str) -> dict:
-    return _explicit_transition(incident_id, "REOPENED")
+def reopen_incident(incident_id: str, reopened_by: str) -> dict:
+    return _explicit_transition(incident_id, "REOPENED", reopened_by)
 
 
-def _explicit_transition(incident_id: str, event: str) -> dict:
+def _explicit_transition(incident_id: str, event: str, actor: str) -> dict:
     """Applica un evento esplicito (REOPENED) con guardia di transizione."""
     incident = db.get_incident(incident_id)
     if incident is None:
@@ -496,6 +480,8 @@ def _explicit_transition(incident_id: str, event: str) -> dict:
     if new_status == incident["status"]:
         raise ValueError(f"Cannot apply {event} from status '{incident['status']}'")
     db.set_incident_status(incident_id, new_status)
+    if event == "REOPENED":
+        db.add_timeline_event(incident_id, "reopen", actor, "Incidente riaperto")
     # Come in resolve_incident: l'incidente esiste di sicuro qui (assert = narrowing).
     updated = db.get_incident(incident_id)
     assert updated is not None
@@ -594,4 +580,3 @@ def capture_human_solution(incident_id: str, solution_text: str,
         "solution": solution_text,
         "provided_by": provided_by,
     }
-
