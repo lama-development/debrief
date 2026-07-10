@@ -35,7 +35,8 @@ interface ChatMessage {
   triage?: TriageData;
   overrideProposal?: OverrideProposal;
   humanHelp?: HumanHelpRequest;
-  overrideDismissed?: boolean;
+  overrideStatus?: "idle" | "pending" | "confirmed" | "cancelled";
+  isFinalResolution?: boolean;
 }
 
 const ASSISTANT_ACTORS = new Set(["triage", "investigator", "resolver", "debrief"]);
@@ -125,10 +126,11 @@ function seedMessages(events: TimelineEvent[]): ChatMessage[] {
       role: isAssistant ? "assistant" : "user",
       agent: isAssistant ? (ev.actor ?? undefined) : undefined,
       timestamp: ev.timestamp,
-      senderId: isAssistant ? undefined : (ev.actor ?? undefined),
+      senderId: isAssistant ? undefined : (ev.actor_user_id ?? ev.actor ?? undefined),
       senderUsername: isAssistant ? undefined : (ev.actor_username ?? ev.actor ?? "Utente"),
       senderTeam: isAssistant ? undefined : (ev.actor_team_name ?? undefined),
       content: ev.content ?? "",
+      isFinalResolution: ev.event_type === "resolution" && ev.actor !== "resolver",
     });
   });
   return out;
@@ -156,13 +158,15 @@ export function ChatPanel({
   const [streaming, setStreaming] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
-  const [overridePending, setOverridePending] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nextLocalId = useRef(-1); // id negativi per i messaggi creati lato client
   const autoSent = useRef(false);
+  // Un ref, oltre allo stato visuale, blocca anche due click avvenuti prima che
+  // React abbia completato il re-render con il pulsante disabilitato.
+  const overrideRequestsInFlight = useRef(new Set<number>());
   // Traccia il messaggio assistente attualmente in costruzione: aggiornato da
   // ogni evento "phase" così i token successivi vanno nella bolla giusta.
   const activeAssistantId = useRef<number | null>(null);
@@ -251,9 +255,7 @@ export function ChatPanel({
       if (assistantId === null) return;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, ...patch, content: patch.content ?? m.content }
-            : m,
+          m.id === assistantId ? { ...m, ...patch, content: patch.content ?? m.content } : m,
         ),
       );
     };
@@ -365,10 +367,14 @@ export function ChatPanel({
   }
 
   async function handleOverrideConfirm(msgId: number) {
+    if (overrideRequestsInFlight.current.has(msgId)) return;
     const msg = messages.find((m) => m.id === msgId);
     if (!msg?.overrideProposal) return;
     const { severity, add_teams, remove_teams } = msg.overrideProposal;
-    setOverridePending(true);
+    overrideRequestsInFlight.current.add(msgId);
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "pending" } : m)),
+    );
     try {
       await incidentsApi.patchClassification(incidentId, {
         severity: severity ?? undefined,
@@ -376,15 +382,25 @@ export function ChatPanel({
         remove_teams,
       });
       setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, overrideDismissed: true } : m)),
+        prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "confirmed" } : m)),
       );
       toast.success("Classificazione aggiornata");
       onClassificationChanged?.();
     } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "idle" } : m)),
+      );
       toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito");
     } finally {
-      setOverridePending(false);
+      overrideRequestsInFlight.current.delete(msgId);
     }
+  }
+
+  function handleOverrideCancel(msgId: number) {
+    if (overrideRequestsInFlight.current.has(msgId)) return;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "cancelled" } : m)),
+    );
   }
 
   return (
@@ -413,7 +429,7 @@ export function ChatPanel({
             message={m}
             incidentId={incidentId}
             onOverrideConfirm={handleOverrideConfirm}
-            overridePending={overridePending}
+            onOverrideCancel={handleOverrideCancel}
             currentUserId={user?.id}
             clarificationsDisabled={streaming}
             onClarificationsSubmit={send}
@@ -531,32 +547,30 @@ function MessageBubble({
   message,
   incidentId,
   onOverrideConfirm,
+  onOverrideCancel,
   onClarificationsSubmit,
-  overridePending,
   clarificationsDisabled,
   currentUserId,
 }: {
   message: ChatMessage;
   incidentId: string;
   onOverrideConfirm: (msgId: number) => void;
+  onOverrideCancel: (msgId: number) => void;
   onClarificationsSubmit: (message: string) => Promise<boolean>;
-  overridePending: boolean;
   clarificationsDisabled: boolean;
   currentUserId?: string;
 }) {
-  const [dismissed, setDismissed] = useState(message.overrideDismissed ?? false);
   const isUser = message.role === "user";
   const isOwn = isUser && message.senderId === currentUserId;
+  const isFinalResolution = message.isFinalResolution === true;
   const identity = getAgentIdentity(message.agent);
+  const overrideStatus = message.overrideStatus ?? "idle";
   const hasVisibleBubble = Boolean(
-    message.content ||
-      message.triage ||
-      (!dismissed && message.overrideProposal) ||
-      message.humanHelp,
+    message.content || message.triage || message.overrideProposal || message.humanHelp,
   );
   const hasGuidedClarifications = Boolean(
     message.triage?.needs_clarification &&
-      message.triage.clarifying_questions.some((question) => question.trim().length > 0),
+    message.triage.clarifying_questions.some((question) => question.trim().length > 0),
   );
   return (
     <div className={cn("flex gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
@@ -595,22 +609,36 @@ function MessageBubble({
             onSubmitClarifications={onClarificationsSubmit}
           />
         )}
-        {message.overrideProposal && !dismissed && (
-          <OverrideConfirmCard
-            proposal={message.overrideProposal}
-            isPending={overridePending}
-            onConfirm={() => onOverrideConfirm(message.id)}
-            onCancel={() => setDismissed(true)}
-          />
+        {message.overrideProposal &&
+          (overrideStatus === "idle" || overrideStatus === "pending") && (
+            <OverrideConfirmCard
+              proposal={message.overrideProposal}
+              isPending={overrideStatus === "pending"}
+              onConfirm={() => onOverrideConfirm(message.id)}
+              onCancel={() => onOverrideCancel(message.id)}
+            />
+          )}
+        {message.overrideProposal && overrideStatus === "confirmed" && (
+          <div className="inline-block rounded-2xl rounded-tl-sm bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-700 shadow-sm dark:text-emerald-400">
+            Modifica applicata.
+          </div>
+        )}
+        {message.overrideProposal && overrideStatus === "cancelled" && (
+          <div className="inline-block rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm text-muted-foreground shadow-sm">
+            Modifica annullata.
+          </div>
         )}
         {message.humanHelp && <HumanHelpCard incidentId={incidentId} request={message.humanHelp} />}
         {message.content && !hasGuidedClarifications && (
           <div
             className={cn(
-              "inline-block rounded-2xl px-3 py-2 text-sm shadow-sm",
+              "inline-block min-w-24 rounded-2xl px-3 py-2 text-sm shadow-sm",
               isUser
                 ? cn(
-                    "whitespace-pre-wrap border border-border bg-muted text-foreground",
+                    "whitespace-pre-wrap",
+                    isFinalResolution
+                      ? "bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-400"
+                      : "border border-border bg-muted text-foreground",
                     isOwn ? "rounded-tr-sm" : "rounded-tl-sm",
                   )
                 : cn("rounded-tl-sm", identity.bubbleCls),
@@ -619,7 +647,7 @@ function MessageBubble({
             {isUser ? (
               renderHumanMessage(message.content)
             ) : (
-              <div className="prose prose-sm max-w-none leading-5 dark:prose-invert prose-headings:mb-1 prose-headings:mt-4 prose-headings:leading-tight prose-p:my-1 prose-p:leading-5 prose-blockquote:my-2 prose-code:text-sm prose-pre:my-1.5 prose-ol:my-1 prose-ol:pl-5 prose-ul:my-1 prose-ul:pl-5 prose-li:my-0 prose-li:leading-5 prose-table:my-2 prose-hr:my-3 [&>:first-child]:mt-0 [&_li+li]:mt-0.5 [&_li>p]:my-0">
+              <div className="prose prose-sm max-w-none leading-5 dark:prose-invert prose-headings:mb-1 prose-headings:mt-4 prose-headings:leading-tight prose-p:my-1 prose-p:leading-5 prose-blockquote:my-2 prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none prose-pre:my-1.5 prose-ol:my-1 prose-ol:pl-5 prose-ul:my-1 prose-ul:pl-5 prose-li:my-0 prose-li:leading-5 prose-table:my-2 prose-hr:my-3 [&>:first-child]:mt-0 [&_li+li]:mt-0.5 [&_li>p]:my-0">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{

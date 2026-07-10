@@ -85,10 +85,14 @@ function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => str
           const parts: string[] = [];
           if (parsed.after?.severity && parsed.after.severity !== parsed.before?.severity)
             parts.push(`Severità: ${parsed.before?.severity ?? "—"} → ${parsed.after.severity}`);
-          if (parsed.after?.add_teams?.length)
-            parts.push(`+${parsed.after.add_teams.map(teamName).join(", ")}`);
-          if (parsed.after?.remove_teams?.length)
-            parts.push(`-${parsed.after.remove_teams.map(teamName).join(", ")}`);
+          if (parsed.after?.add_teams?.length) {
+            const label = parsed.after.add_teams.length === 1 ? "Team aggiunto" : "Team aggiunti";
+            parts.push(`${label}: ${parsed.after.add_teams.map(teamName).join(", ")}`);
+          }
+          if (parsed.after?.remove_teams?.length) {
+            const label = parsed.after.remove_teams.length === 1 ? "Team rimosso" : "Team rimossi";
+            parts.push(`${label}: ${parsed.after.remove_teams.map(teamName).join(", ")}`);
+          }
           if (parsed.reason) parts.push(`motivo: ${parsed.reason}`);
           detail = parts.join(" · ") || undefined;
         } catch {

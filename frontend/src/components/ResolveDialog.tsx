@@ -60,7 +60,7 @@ export function ResolveDialog({
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="summary">Riepilogo risoluzione *</Label>
+            <Label htmlFor="summary">Riepilogo risoluzione</Label>
             <Textarea
               id="summary"
               value={summary}

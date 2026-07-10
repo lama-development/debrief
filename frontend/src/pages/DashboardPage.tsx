@@ -73,9 +73,9 @@ export function DashboardPage() {
           ) : (
             <>
               <StatCard
-                title="Totale incidenti"
+                title="Incidenti assegnati"
                 value={metrics.data?.total ?? 0}
-                description="Numero complessivo di incidenti registrati."
+                description="Incidenti creati da te, a cui partecipi o assegnati al tuo team."
               />
               <StatCard
                 title="In corso"

@@ -5,7 +5,7 @@ import type { IncidentStatus, Severity } from "@/lib/types";
 
 export const STATUS_LABEL: Record<IncidentStatus, string> = {
   open: "Da classificare", // non ancora classificato dal triage (o in attesa di dettagli)
-  active: "Attivo",
+  active: "In corso",
   resolved: "Risolto",
 };
 

@@ -310,8 +310,9 @@ export function IncidentDetailPage() {
                           Aggiungi
                         </button>
                       ) : (
-                        teams.filter((t) => !incident.involved_teams.includes(t.id)).map(
-                          (t) => (
+                        teams
+                          .filter((t) => !incident.involved_teams.includes(t.id))
+                          .map((t) => (
                             <button
                               key={t.id}
                               type="button"
@@ -322,8 +323,7 @@ export function IncidentDetailPage() {
                               <Plus className="h-3 w-3" />
                               {t.name}
                             </button>
-                          ),
-                        )
+                          ))
                       )}
                     </div>
                   )}
@@ -356,7 +356,7 @@ export function IncidentDetailPage() {
           >
             <CardContent className="min-h-0 flex-1 p-0">
               <ChatPanel
-                key={incident.id}
+                key={`${incident.id}:${incident.status}`}
                 incidentId={incident.id}
                 status={incident.status}
                 initialEvents={incident.timeline}

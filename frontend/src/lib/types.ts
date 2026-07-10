@@ -40,6 +40,7 @@ export interface TimelineEvent {
   // "message" | "triage" | "escalation" | "resolution" | "reopen" | "involvement"
   event_type: string;
   actor: string | null;
+  actor_user_id: string | null;
   actor_username: string | null;
   actor_team_id: string | null;
   actor_team_name: string | null;

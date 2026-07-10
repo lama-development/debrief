@@ -1,5 +1,3 @@
-import { CheckCircle, XCircle } from "lucide-react";
-
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { Button } from "@/components/ui/button";
 import { useTeams } from "@/hooks/useTeams";
@@ -69,23 +67,10 @@ export function OverrideConfirmCard({
       )}
 
       <div className="flex gap-2 pt-1">
-        <Button
-          size="sm"
-          onClick={onConfirm}
-          disabled={isPending || !hasChanges}
-          className="gap-1.5"
-        >
-          <CheckCircle className="h-3.5 w-3.5" />
+        <Button size="sm" onClick={onConfirm} disabled={isPending || !hasChanges}>
           Conferma
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isPending}
-          className="gap-1.5"
-        >
-          <XCircle className="h-3.5 w-3.5" />
+        <Button size="sm" variant="outline" onClick={onCancel} disabled={isPending}>
           Annulla
         </Button>
       </div>

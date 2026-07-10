@@ -6,7 +6,7 @@ export interface AgentIdentity {
 }
 
 const BOT_ICON_CLS = "border border-primary/25 bg-primary/10 text-primary";
-const BOT_BUBBLE_CLS = "border border-primary/20 bg-primary/5 text-foreground dark:bg-primary/10";
+const BOT_BUBBLE_CLS = "border border-primary/10 bg-primary/5 text-foreground dark:bg-primary/10";
 const BOT_TIMELINE_CLS = "border-primary/25 bg-primary/10 text-primary";
 
 function botIdentity(label: string): AgentIdentity {

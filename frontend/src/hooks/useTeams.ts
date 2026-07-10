@@ -11,14 +11,8 @@ export function useTeams() {
     staleTime: Infinity,
   });
   const teams = useMemo(() => query.data ?? [], [query.data]);
-  const namesById = useMemo(
-    () => new Map(teams.map((team) => [team.id, team.name])),
-    [teams],
-  );
-  const teamName = useCallback(
-    (teamId: string) => namesById.get(teamId) ?? teamId,
-    [namesById],
-  );
+  const namesById = useMemo(() => new Map(teams.map((team) => [team.id, team.name])), [teams]);
+  const teamName = useCallback((teamId: string) => namesById.get(teamId) ?? teamId, [namesById]);
 
   return { ...query, teams, teamName };
 }

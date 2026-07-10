@@ -27,7 +27,7 @@ export function SeverityBadge({
     <Tooltip content={SEVERITY_TOOLTIP[severity]}>
       <span
         className={cn(
-          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold shadow-sm",
+          "inline-flex cursor-help items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold shadow-sm",
           SEVERITY_CLASS[severity],
           className,
         )}
