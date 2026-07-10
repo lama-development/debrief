@@ -1,18 +1,19 @@
 """
-run_seed.py - Popola SQLite e LanceDB da zero con i dati di seed.
+run_seed.py - Aggiorna SQLite e rigenera LanceDB con i dati di seed.
 
 Uso:
     uv run seed
 
 Cosa fa:
-1. Crea le tabelle SQLite
-2. Carica team e incidenti in SQLite
+1. Crea le tabelle SQLite mancanti
+2. Inserisce o sostituisce team e incidenti seed in SQLite
 3. Calcola gli embedding localmente
 4. Indicizza incidenti passati e knowledge base in LanceDB
 5. Esegue un test di ricerca semantica per verificare che funzioni
 
-È uno SCRIPT, non un modulo importato dall'app: si lancia una volta sola per
-preparare il database iniziale (i dati passati su cui il RAG farà le ricerche).
+È uno SCRIPT, non un modulo importato dall'app. È ripetibile sui dati demo, ma
+non azzera utenti, sessioni o incidenti runtime non collidenti: non va usato come
+migrazione o reset di un ambiente con dati importanti.
 """
 
 import os
@@ -61,7 +62,6 @@ def main():
     print("[INFO] Preparing database")
     conn = get_connection()
     create_tables(conn)              # idempotente: sicuro anche se le tabelle esistono già
-    conn.execute("DROP TABLE IF EXISTS verified_solutions")
     print("[OK] Tables created")
 
     # Ogni loader restituisce QUANTI record ha caricato: lo stampiamo come riscontro.
@@ -82,7 +82,7 @@ def main():
         incidents = json.load(f)
 
     # Nel RAG (past_incidents) finiscono SOLO gli incidenti risolti: sono gli unici
-    # con root_cause e resolution_steps, cioè con qualcosa di utile da recuperare.
+    # con una resolution, cioè con qualcosa di utile da recuperare.
     # Gli incidenti open/active sono "in corso" e non hanno una risoluzione da indicizzare.
     rag_incidents = [inc for inc in incidents if inc.get("status", "resolved") == "resolved"]
 
@@ -153,10 +153,6 @@ def main():
     print("\n== Indexing ==")
     print("[INFO] Writing LanceDB tables")
     db = get_db()
-    try:
-        db.drop_table("verified_solutions")
-    except Exception:
-        pass
 
     # Ogni funzione index_* crea/sovrascrive la sua collezione e restituisce il
     # numero di record indicizzati.

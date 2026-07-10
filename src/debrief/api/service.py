@@ -520,8 +520,8 @@ def get_metrics() -> dict:
 
 def _build_debrief_report(incident: dict, resolution_summary: str) -> dict:
     """Assembla un DebriefReport minimale (v1) a partire da incidente + timeline.
-    Impact/detection/root_cause non sono derivati automaticamente in questa
-    versione; resolution_steps contiene il riepilogo di chiusura fornito."""
+    Impact, detection e root cause non sono derivati automaticamente in questa
+    versione; `resolution` contiene il riepilogo di chiusura fornito."""
     # Severity(stringa) prova a convertire il testo nell'Enum; se il valore è
     # mancante o non valido, ripieghiamo su SEV3 (un default ragionevole).
     try:

@@ -7,7 +7,7 @@ Esegue suite di test per le capacita' chiave del sistema:
   2. routing   - correttezza dell'Orchestrator (router LLM) nello smistare i messaggi
   3. resolver  - groundedness e provenance delle remediation
   4. retrieval - qualita' del RAG (precision/recall/MRR sugli incidenti attesi)
-5. learning  - loop di apprendimento da soluzione umana
+  5. learning  - loop di apprendimento da soluzione umana
   6. injection - robustezza alla prompt injection (red-team, metrica di sicurezza)
 
 I pochi casi rappresentativi e la ground truth del retrieval stanno nell'unico

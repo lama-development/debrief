@@ -3,12 +3,13 @@ app.py - Applicazione FastAPI di Debrief.
 
 Assembla i router (auth, incidenti, chat, metriche) sopra il service layer.
 Allo startup garantisce che la cartella data/ e le tabelle SQLite esistano,
-così un clone pulito parte senza passaggi manuali.
+così l'API parte senza creare manualmente lo schema. Catalogo team e RAG
+richiedono comunque `uv run seed`.
 
 Avvio:
     uv run dev
     # oppure
-    uv run uvicorn src.debrief.api.app:app --reload
+    uv run uvicorn debrief.api.app:app --reload
 """
 
 # asynccontextmanager: serve a creare la funzione `lifespan` (vedi sotto), che
@@ -31,8 +32,8 @@ CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
 
 # @asynccontextmanager + funzione con `yield` = "lifespan" di FastAPI. Tutto ciò
 # che sta PRIMA dello yield viene eseguito all'AVVIO; ciò che sta dopo allo
-# SPEGNIMENTO. Qui all'avvio garantiamo che DB e tabelle esistano (idempotente),
-# così un clone pulito del progetto parte senza setup manuale.
+# SPEGNIMENTO. Qui all'avvio garantiamo che DB e tabelle esistano (idempotente).
+# I dati dimostrativi e le collezioni vettoriali restano responsabilità del seed.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = get_connection()

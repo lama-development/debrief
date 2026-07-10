@@ -44,7 +44,7 @@ def index_incidents(db: lancedb.DBConnection, incidents: list[dict], vectors: li
     """Indicizza gli incidenti passati in LanceDB.
 
     Per ogni incidente, il testo incorporato è:
-    descrizione + root_cause + resolution_steps
+    titolo + descrizione + risoluzione
     (così l'investigator può cercare sia per sintomi che per soluzioni)
     """
     # zip(a, b) accoppia gli elementi delle due liste: (inc1, vec1), (inc2, vec2)...

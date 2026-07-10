@@ -140,7 +140,7 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
     """Carica gli incidenti seed in SQLite rispettando lo `status` di ciascuno.
 
     Il dataset di seed contiene un mix dei 3 stati per mostrare tutti i casi:
-    - 'resolved' → incidenti passati e chiusi (con root_cause/resolution + debriefing);
+    - 'resolved' → incidenti passati e chiusi (con resolution + debriefing);
     - 'active'   → incidenti classificati e in lavorazione (senza risoluzione);
     - 'open'     → incidenti dichiarati ma non ancora classificati (senza categoria/severità).
     Lo status di default è 'resolved' se il campo manca."""

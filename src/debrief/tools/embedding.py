@@ -36,6 +36,8 @@ def get_model() -> SentenceTransformer:
     if _model is None:
         model_name = os.getenv("EMBEDDING_MODEL", EMBEDDING_MODEL)
         logger.info("Loading embedding model: %s", model_name)
+        # Al primo uso il modello viene scaricato; poi Sentence Transformers usa
+        # la propria cache locale.
         _model = SentenceTransformer(model_name)
         logger.info("Embedding model loaded (dimension=%s)", _model.get_embedding_dimension())
     return _model
