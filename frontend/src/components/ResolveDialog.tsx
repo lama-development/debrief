@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from "react"
-import { toast } from "sonner"
+import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
 
-import { useResolveIncident } from "@/hooks/useIncident"
-import { ApiError } from "@/lib/api"
-import { Button } from "@/components/ui/button"
+import { useResolveIncident } from "@/hooks/useIncident";
+import { ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,26 +12,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 // Dialog di chiusura incidente: richiede soltanto il riepilogo della risoluzione.
 export function ResolveDialog({ incidentId }: { incidentId: string }) {
-  const [open, setOpen] = useState(false)
-  const [summary, setSummary] = useState("")
-  const resolve = useResolveIncident(incidentId)
+  const [open, setOpen] = useState(false);
+  const [summary, setSummary] = useState("");
+  const resolve = useResolveIncident(incidentId);
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!summary.trim()) return
+    e.preventDefault();
+    if (!summary.trim()) return;
     try {
-      await resolve.mutateAsync({ resolution_summary: summary.trim() })
-      toast.success("Incidente risolto")
-      setOpen(false)
-      setSummary("")
+      await resolve.mutateAsync({ resolution_summary: summary.trim() });
+      toast.success("Incidente risolto");
+      setOpen(false);
+      setSummary("");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Risoluzione fallita")
+      toast.error(err instanceof ApiError ? err.message : "Risoluzione fallita");
     }
   }
 
@@ -69,5 +69,5 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

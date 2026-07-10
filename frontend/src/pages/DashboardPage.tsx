@@ -1,23 +1,23 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { AppHeader } from "@/components/AppHeader"
-import { NewIncidentDialog } from "@/components/NewIncidentDialog"
-import { SeverityBadge } from "@/components/SeverityBadge"
-import { StatusBadge } from "@/components/StatusBadge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useIncidents } from "@/hooks/useIncidents"
-import { useMetrics } from "@/hooks/useMetrics"
-import { ALL_STATUSES, STATUS_LABEL, formatDateTime, formatMttr } from "@/lib/labels"
-import { cn } from "@/lib/utils"
-import type { IncidentStatus } from "@/lib/types"
+import { AppHeader } from "@/components/AppHeader";
+import { NewIncidentDialog } from "@/components/NewIncidentDialog";
+import { SeverityBadge } from "@/components/SeverityBadge";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useIncidents } from "@/hooks/useIncidents";
+import { useMetrics } from "@/hooks/useMetrics";
+import { ALL_STATUSES, STATUS_LABEL, formatDateTime, formatMttr } from "@/lib/labels";
+import { cn } from "@/lib/utils";
+import type { IncidentStatus } from "@/lib/types";
 
-const OPEN_STATUSES: IncidentStatus[] = ["open", "active"]
+const OPEN_STATUSES: IncidentStatus[] = ["open", "active"];
 
 // Classi base per le celle della tabella (intestazione e corpo).
-const TH = "h-12 px-4 text-left align-middle font-medium text-muted-foreground"
-const TD = "p-4 align-middle"
+const TH = "h-12 px-4 text-left align-middle font-medium text-muted-foreground";
+const TD = "p-4 align-middle";
 
 function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
@@ -29,18 +29,18 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
         <div className="text-2xl font-semibold">{value}</div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 export function DashboardPage() {
-  const [filter, setFilter] = useState<IncidentStatus | undefined>(undefined)
-  const navigate = useNavigate()
-  const metrics = useMetrics()
-  const incidents = useIncidents(filter)
+  const [filter, setFilter] = useState<IncidentStatus | undefined>(undefined);
+  const navigate = useNavigate();
+  const metrics = useMetrics();
+  const incidents = useIncidents(filter);
 
-  const byStatus = metrics.data?.by_status ?? {}
-  const openCount = OPEN_STATUSES.reduce((sum, s) => sum + (byStatus[s] ?? 0), 0)
-  const resolvedCount = byStatus["resolved"] ?? 0
+  const byStatus = metrics.data?.by_status ?? {};
+  const openCount = OPEN_STATUSES.reduce((sum, s) => sum + (byStatus[s] ?? 0), 0);
+  const resolvedCount = byStatus["resolved"] ?? 0;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -60,17 +60,18 @@ export function DashboardPage() {
               <StatCard title="Totale incidenti" value={metrics.data?.total ?? 0} />
               <StatCard title="In corso" value={openCount} />
               <StatCard title="Risolti" value={resolvedCount} />
-              <StatCard
-                title="MTTR medio"
-                value={formatMttr(metrics.data?.mttr_seconds ?? null)}
-              />
+              <StatCard title="MTTR medio" value={formatMttr(metrics.data?.mttr_seconds ?? null)} />
             </>
           )}
         </div>
 
         {/* Filtro per stato */}
         <div className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible [&>*]:shrink-0">
-          <FilterChip label="Tutti" active={filter === undefined} onClick={() => setFilter(undefined)} />
+          <FilterChip
+            label="Tutti"
+            active={filter === undefined}
+            onClick={() => setFilter(undefined)}
+          />
           {ALL_STATUSES.map((s) => (
             <FilterChip
               key={s}
@@ -143,7 +144,7 @@ export function DashboardPage() {
         </Card>
       </main>
     </div>
-  )
+  );
 }
 
 function FilterChip({
@@ -151,9 +152,9 @@ function FilterChip({
   active,
   onClick,
 }: {
-  label: string
-  active: boolean
-  onClick: () => void
+  label: string;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -168,5 +169,5 @@ function FilterChip({
     >
       {label}
     </button>
-  )
+  );
 }

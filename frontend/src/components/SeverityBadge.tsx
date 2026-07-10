@@ -1,10 +1,16 @@
-import { cn } from "@/lib/utils"
-import { SEVERITY_CLASS, SEVERITY_LABEL, SEVERITY_TOOLTIP } from "@/lib/labels"
-import type { Severity } from "@/lib/types"
-import { Tooltip } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils";
+import { SEVERITY_CLASS, SEVERITY_LABEL, SEVERITY_TOOLTIP } from "@/lib/labels";
+import type { Severity } from "@/lib/types";
+import { Tooltip } from "@/components/ui/tooltip";
 
 // Badge severità con colore dedicato (SEV1 rosso … SEV4 grigio).
-export function SeverityBadge({ severity, className }: { severity: Severity | null; className?: string }) {
+export function SeverityBadge({
+  severity,
+  className,
+}: {
+  severity: Severity | null;
+  className?: string;
+}) {
   if (!severity) {
     return (
       <span
@@ -15,7 +21,7 @@ export function SeverityBadge({ severity, className }: { severity: Severity | nu
       >
         N/A
       </span>
-    )
+    );
   }
   return (
     <Tooltip content={SEVERITY_TOOLTIP[severity]}>
@@ -29,5 +35,5 @@ export function SeverityBadge({ severity, className }: { severity: Severity | nu
         {SEVERITY_LABEL[severity]}
       </span>
     </Tooltip>
-  )
+  );
 }

@@ -1,46 +1,46 @@
-import { useState, type FormEvent } from "react"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useState, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-import { useAuth } from "@/auth/AuthContext"
-import { ApiError } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useAuth } from "@/auth/AuthContext";
+import { ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface LocationState {
-  from?: { pathname: string }
+  from?: { pathname: string };
 }
 
 export function LoginPage() {
-  const { login, register } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const from = (location.state as LocationState | null)?.from?.pathname ?? "/"
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as LocationState | null)?.from?.pathname ?? "/";
 
-  const [mode, setMode] = useState<"login" | "register">("login")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSubmitting(true)
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
     try {
-      if (mode === "login") await login(username, password)
-      else await register(username, password)
-      navigate(from, { replace: true })
+      if (mode === "login") await login(username, password);
+      else await register(username, password);
+      navigate(from, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Errore inatteso. Riprova.")
+      setError(err instanceof ApiError ? err.message : "Errore inatteso. Riprova.");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black p-4">
+    <div className="flex min-h-screen items-center justify-center bg-white p-4 dark:bg-black">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <img src="/favicon.svg" alt="" className="mx-auto mb-2 h-12 w-12" />
@@ -86,8 +86,8 @@ export function LoginPage() {
               type="button"
               className="font-medium text-primary hover:underline"
               onClick={() => {
-                setMode(mode === "login" ? "register" : "login")
-                setError(null)
+                setMode(mode === "login" ? "register" : "login");
+                setError(null);
               }}
             >
               {mode === "login" ? "Registrati" : "Accedi"}
@@ -96,5 +96,5 @@ export function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

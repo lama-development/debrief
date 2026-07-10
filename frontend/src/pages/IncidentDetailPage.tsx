@@ -1,49 +1,49 @@
-import type { ReactNode } from "react"
-import { useEffect, useRef, useState } from "react"
-import { Link, useParams } from "react-router-dom"
-import { useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, ChevronDown, Plus, X } from "lucide-react"
-import { toast } from "sonner"
+import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ChevronDown, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 
-import { AppHeader } from "@/components/AppHeader"
-import { ChatPanel } from "@/components/ChatPanel"
-import { ResolveDialog } from "@/components/ResolveDialog"
-import { SeverityBadge } from "@/components/SeverityBadge"
-import { StatusBadge } from "@/components/StatusBadge"
-import { Timeline } from "@/components/Timeline"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
-import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels"
-import { useIncident, useReopenIncident } from "@/hooks/useIncident"
-import { useUpdateClassification } from "@/hooks/useUpdateClassification"
-import { ApiError } from "@/lib/api"
-import type { IncidentStatus, DebriefReport, Severity } from "@/lib/types"
+import { AppHeader } from "@/components/AppHeader";
+import { ChatPanel } from "@/components/ChatPanel";
+import { ResolveDialog } from "@/components/ResolveDialog";
+import { SeverityBadge } from "@/components/SeverityBadge";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Timeline } from "@/components/Timeline";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels";
+import { useIncident, useReopenIncident } from "@/hooks/useIncident";
+import { useUpdateClassification } from "@/hooks/useUpdateClassification";
+import { ApiError } from "@/lib/api";
+import type { IncidentStatus, DebriefReport, Severity } from "@/lib/types";
 
-const ALL_SEVERITIES: Severity[] = ["SEV1", "SEV2", "SEV3", "SEV4"]
+const ALL_SEVERITIES: Severity[] = ["SEV1", "SEV2", "SEV3", "SEV4"];
 
 function SeverityDropdown({
   value,
   disabled,
   onChange,
 }: {
-  value: Severity
-  disabled: boolean
-  onChange: (s: Severity) => void
+  value: Severity;
+  disabled: boolean;
+  onChange: (s: Severity) => void;
 }) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function onPointerDown(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setOpen(false);
       }
     }
-    document.addEventListener("pointerdown", onPointerDown)
-    return () => document.removeEventListener("pointerdown", onPointerDown)
-  }, [open])
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -68,7 +68,10 @@ function SeverityDropdown({
               key={s}
               type="button"
               disabled={disabled}
-              onClick={() => { onChange(s); setOpen(false) }}
+              onClick={() => {
+                onChange(s);
+                setOpen(false);
+              }}
               title={SEVERITY_TOOLTIP[s]}
               className={cn(
                 "w-full rounded px-2 py-1.5 text-left text-sm disabled:opacity-50",
@@ -81,7 +84,7 @@ function SeverityDropdown({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // Team catalog mirrored from seed/teams.json — IDs stabili, non cambiano a runtime.
@@ -93,37 +96,37 @@ const ALL_TEAMS: { id: string; label: string }[] = [
   { id: "PRODUCTION", label: "Reparto Produzione" },
   { id: "LAB", label: "Laboratorio" },
   { id: "MANAGEMENT", label: "Direzione" },
-]
+];
 
-const RESOLVABLE: IncidentStatus[] = ["open", "active"]
+const RESOLVABLE: IncidentStatus[] = ["open", "active"];
 
 export function IncidentDetailPage() {
-  const { id = "" } = useParams()
-  const qc = useQueryClient()
-  const { data: incident, isLoading, isError } = useIncident(id)
-  const reopen = useReopenIncident(id)
-  const updateClass = useUpdateClassification(id)
-  const [mobileTab, setMobileTab] = useState<"chat" | "details">("chat")
-  const [showTeamPicker, setShowTeamPicker] = useState(false)
-  const teamPickerRef = useRef<HTMLDivElement>(null)
+  const { id = "" } = useParams();
+  const qc = useQueryClient();
+  const { data: incident, isLoading, isError } = useIncident(id);
+  const reopen = useReopenIncident(id);
+  const updateClass = useUpdateClassification(id);
+  const [mobileTab, setMobileTab] = useState<"chat" | "details">("chat");
+  const [showTeamPicker, setShowTeamPicker] = useState(false);
+  const teamPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!showTeamPicker) return
+    if (!showTeamPicker) return;
     function onPointerDown(e: PointerEvent) {
       if (teamPickerRef.current && !teamPickerRef.current.contains(e.target as Node)) {
-        setShowTeamPicker(false)
+        setShowTeamPicker(false);
       }
     }
-    document.addEventListener("pointerdown", onPointerDown)
-    return () => document.removeEventListener("pointerdown", onPointerDown)
-  }, [showTeamPicker])
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [showTeamPicker]);
 
   if (isLoading) {
     return (
       <Shell>
         <p className="text-muted-foreground">Caricamento incidente…</p>
       </Shell>
-    )
+    );
   }
   if (isError || !incident) {
     return (
@@ -133,47 +136,47 @@ export function IncidentDetailPage() {
           ← Torna alla dashboard
         </Link>
       </Shell>
-    )
+    );
   }
 
   async function onReopen() {
     try {
-      await reopen.mutateAsync()
-      toast.success("Incidente riaperto")
+      await reopen.mutateAsync();
+      toast.success("Incidente riaperto");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Riapertura fallita")
+      toast.error(err instanceof ApiError ? err.message : "Riapertura fallita");
     }
   }
 
-  const canResolve = RESOLVABLE.includes(incident.status)
-  const isResolved = incident.status === "resolved"
-  const canOverride = !isResolved
-  const currentSeverity = incident.severity
+  const canResolve = RESOLVABLE.includes(incident.status);
+  const isResolved = incident.status === "resolved";
+  const canOverride = !isResolved;
+  const currentSeverity = incident.severity;
 
   async function onSeverityChange(newSev: Severity) {
-    if (newSev === currentSeverity) return
+    if (newSev === currentSeverity) return;
     try {
-      await updateClass.mutateAsync({ severity: newSev })
-      toast.success(`Severità aggiornata a ${newSev}`)
+      await updateClass.mutateAsync({ severity: newSev });
+      toast.success(`Severità aggiornata a ${newSev}`);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito")
+      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito");
     }
   }
 
   async function onAddTeam(teamId: string) {
     try {
-      await updateClass.mutateAsync({ add_teams: [teamId] })
-      setShowTeamPicker(false)
+      await updateClass.mutateAsync({ add_teams: [teamId] });
+      setShowTeamPicker(false);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito")
+      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito");
     }
   }
 
   async function onRemoveTeam(teamId: string) {
     try {
-      await updateClass.mutateAsync({ remove_teams: [teamId] })
+      await updateClass.mutateAsync({ remove_teams: [teamId] });
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Rimozione fallita")
+      toast.error(err instanceof ApiError ? err.message : "Rimozione fallita");
     }
   }
 
@@ -182,17 +185,25 @@ export function IncidentDetailPage() {
       <AppHeader />
 
       {/* Intestazione incidente */}
-      <div className="container pt-4 relative z-20">
+      <div className="container relative z-20 pt-4">
         <Card className="px-4 py-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Torna alla dashboard">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              aria-label="Torna alla dashboard"
+            >
               <Link to="/">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-semibold tracking-tight leading-tight line-clamp-2">{incident.title}</h1>
-              <div className="flex items-center justify-between gap-2 mt-1.5">
+              <h1 className="line-clamp-2 text-base font-semibold leading-tight tracking-tight">
+                {incident.title}
+              </h1>
+              <div className="mt-1.5 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={incident.status} />
                   {canOverride && incident.severity ? (
@@ -205,17 +216,22 @@ export function IncidentDetailPage() {
                     <SeverityBadge severity={incident.severity} />
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0 sm:hidden">
+                <div className="flex shrink-0 items-center gap-2 sm:hidden">
                   {canResolve && <ResolveDialog incidentId={incident.id} />}
                   {isResolved && (
-                    <Button variant="outline" size="sm" onClick={onReopen} disabled={reopen.isPending}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onReopen}
+                      disabled={reopen.isPending}
+                    >
                       Riapri
                     </Button>
                   )}
                 </div>
               </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 shrink-0">
+            <div className="hidden shrink-0 items-center gap-2 sm:flex">
               {canResolve && <ResolveDialog incidentId={incident.id} />}
               {isResolved && (
                 <Button variant="outline" onClick={onReopen} disabled={reopen.isPending}>
@@ -228,7 +244,7 @@ export function IncidentDetailPage() {
       </div>
 
       {/* Due pannelli: dettaglio (sinistra) + chat (destra) */}
-      <div className="container min-h-0 flex-1 flex flex-col gap-4 py-4">
+      <div className="container flex min-h-0 flex-1 flex-col gap-4 py-4">
         {/* Selettore tab — visibile solo sotto lg */}
         <div className="flex rounded-lg bg-muted p-1 text-sm font-medium lg:hidden">
           <button
@@ -236,7 +252,9 @@ export function IncidentDetailPage() {
             onClick={() => setMobileTab("chat")}
             className={cn(
               "flex-1 rounded-md py-1.5 transition-colors",
-              mobileTab === "chat" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+              mobileTab === "chat"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             Chat
@@ -246,22 +264,31 @@ export function IncidentDetailPage() {
             onClick={() => setMobileTab("details")}
             className={cn(
               "flex-1 rounded-md py-1.5 transition-colors",
-              mobileTab === "details" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+              mobileTab === "details"
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             Dettagli
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
           {/* Sinistra: descrizione, timeline e debriefing */}
-          <div className={cn("min-h-0 space-y-4 overflow-y-auto pr-1", mobileTab !== "details" && "hidden lg:block")}>
+          <div
+            className={cn(
+              "min-h-0 space-y-4 overflow-y-auto pr-1",
+              mobileTab !== "details" && "hidden lg:block",
+            )}
+          >
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Descrizione</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm text-foreground/90">{incident.description}</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground/90">
+                  {incident.description}
+                </p>
               </CardContent>
             </Card>
 
@@ -291,7 +318,7 @@ export function IncidentDetailPage() {
               <CardContent>
                 <div className="flex flex-wrap gap-1.5">
                   {incident.involved_teams.map((teamId) => {
-                    const label = ALL_TEAMS.find((t) => t.id === teamId)?.label ?? teamId
+                    const label = ALL_TEAMS.find((t) => t.id === teamId)?.label ?? teamId;
                     return (
                       <span
                         key={teamId}
@@ -310,7 +337,7 @@ export function IncidentDetailPage() {
                           </button>
                         )}
                       </span>
-                    )
+                    );
                   })}
 
                   {canOverride && (
@@ -325,18 +352,20 @@ export function IncidentDetailPage() {
                           Aggiungi
                         </button>
                       ) : (
-                        ALL_TEAMS.filter((t) => !incident.involved_teams.includes(t.id)).map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => void onAddTeam(t.id)}
-                            disabled={updateClass.isPending}
-                            className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50"
-                          >
-                            <Plus className="h-3 w-3" />
-                            {t.label}
-                          </button>
-                        ))
+                        ALL_TEAMS.filter((t) => !incident.involved_teams.includes(t.id)).map(
+                          (t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => void onAddTeam(t.id)}
+                              disabled={updateClass.isPending}
+                              className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
+                            >
+                              <Plus className="h-3 w-3" />
+                              {t.label}
+                            </button>
+                          ),
+                        )
                       )}
                     </div>
                   )}
@@ -361,7 +390,12 @@ export function IncidentDetailPage() {
           </div>
 
           {/* Destra: chat */}
-          <Card className={cn("flex min-h-0 flex-col overflow-hidden", mobileTab !== "chat" && "hidden lg:flex")}>
+          <Card
+            className={cn(
+              "flex min-h-0 flex-col overflow-hidden",
+              mobileTab !== "chat" && "hidden lg:flex",
+            )}
+          >
             <CardContent className="min-h-0 flex-1 p-0">
               <ChatPanel
                 key={incident.id}
@@ -370,14 +404,16 @@ export function IncidentDetailPage() {
                 initialEvents={incident.timeline}
                 initialDraft={incident.status === "open" ? incident.description : ""}
                 onTurnComplete={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
-                onClassificationChanged={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
+                onClassificationChanged={() =>
+                  qc.invalidateQueries({ queryKey: ["incident", incident.id] })
+                }
               />
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function DebriefReportCard({ report }: { report: DebriefReport }) {
@@ -386,11 +422,9 @@ function DebriefReportCard({ report }: { report: DebriefReport }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Debriefing</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        {report.resolution}
-      </CardContent>
+      <CardContent className="space-y-3 text-sm">{report.resolution}</CardContent>
     </Card>
-  )
+  );
 }
 
 function Shell({ children }: { children: ReactNode }) {
@@ -399,5 +433,5 @@ function Shell({ children }: { children: ReactNode }) {
       <AppHeader />
       <main className="container space-y-2 py-6">{children}</main>
     </div>
-  )
+  );
 }

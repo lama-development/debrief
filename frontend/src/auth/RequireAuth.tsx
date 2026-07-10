@@ -1,25 +1,25 @@
-import { Navigate, useLocation } from "react-router-dom"
-import type { ReactNode } from "react"
+import { Navigate, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 
-import { useAuth } from "@/auth/AuthContext"
+import { useAuth } from "@/auth/AuthContext";
 
 // Guardia di route: mostra i figli solo se l'utente è autenticato, altrimenti
 // reindirizza a /login (ricordando la destinazione per il redirect post-login).
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
-  const location = useLocation()
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center text-muted-foreground">
         Caricamento…
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

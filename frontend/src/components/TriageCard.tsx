@@ -1,10 +1,10 @@
-import { ClipboardCheck } from "lucide-react"
+import { ClipboardCheck } from "lucide-react";
 
-import { SeverityBadge } from "@/components/SeverityBadge"
-import type { TriageData } from "@/lib/types"
+import { SeverityBadge } from "@/components/SeverityBadge";
+import type { TriageData } from "@/lib/types";
 
 export function TriageCard({ data }: { data: TriageData }) {
-  const confidence = Math.round(data.confidence * 100)
+  const confidence = Math.round(data.confidence * 100);
 
   return (
     <div className="rounded-lg border bg-card p-3 text-sm">
@@ -21,15 +21,19 @@ export function TriageCard({ data }: { data: TriageData }) {
       {data.suggested_teams.length > 0 && (
         <div className="mt-2.5 border-t pt-2.5">
           <div className="flex items-start gap-2">
-            <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground pt-0.5">Team</span>
+            <span className="w-20 shrink-0 pt-0.5 text-xs font-medium text-muted-foreground">
+              Team
+            </span>
             <div className="flex flex-wrap gap-1">
               {data.suggested_teams.map((t) => (
-                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{t}</span>
+                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+                  {t}
+                </span>
               ))}
             </div>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

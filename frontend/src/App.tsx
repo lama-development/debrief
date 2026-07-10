@@ -1,9 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { RequireAuth } from "@/auth/RequireAuth"
-import { DashboardPage } from "@/pages/DashboardPage"
-import { IncidentDetailPage } from "@/pages/IncidentDetailPage"
-import { LoginPage } from "@/pages/LoginPage"
+import { RequireAuth } from "@/auth/RequireAuth";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { IncidentDetailPage } from "@/pages/IncidentDetailPage";
+import { LoginPage } from "@/pages/LoginPage";
 
 function App() {
   return (
@@ -28,7 +28,7 @@ function App() {
       {/* Qualsiasi altra rotta torna alla dashboard. */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;
