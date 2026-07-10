@@ -396,11 +396,25 @@ def override_classification(
     before_sev = incident.get("severity")
     before_teams = db.get_incident_teams(incident_id)
 
-    if override.severity is not None:
+    severity_changed = (
+        override.severity is not None and override.severity.value != before_sev
+    )
+    if severity_changed:
         db.update_incident_severity(incident_id, override.severity.value)
 
-    add_teams = [t for t in override.add_teams if t in valid_ids]
-    remove_teams = [t for t in override.remove_teams if t in valid_ids]
+    # Applica solo transizioni reali e rimuove i duplicati mantenendo l'ordine.
+    # In questo modo anche un retry della stessa richiesta non sporca la timeline.
+    current_teams = set(before_teams)
+    add_teams = list(dict.fromkeys(
+        t for t in override.add_teams if t in valid_ids and t not in current_teams
+    ))
+    remove_teams = list(dict.fromkeys(
+        t for t in override.remove_teams if t in valid_ids and t in current_teams
+    ))
+
+    if not severity_changed and not add_teams and not remove_teams:
+        return incident
+
     for team_id in add_teams:
         db.add_timeline_event(incident_id, "involvement", actor, team_id)
     for team_id in remove_teams:
@@ -409,7 +423,7 @@ def override_classification(
     log = json.dumps({
         "before": {"severity": before_sev, "teams": before_teams},
         "after": {
-            "severity": override.severity.value if override.severity else before_sev,
+            "severity": override.severity.value if severity_changed else before_sev,
             "add_teams": add_teams,
             "remove_teams": remove_teams,
         },

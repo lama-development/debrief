@@ -30,6 +30,8 @@ import json
 import re
 import time
 
+from dotenv import load_dotenv
+
 # Su Windows il terminale usa spesso cp1252; forziamo stdout/stderr in UTF-8
 # cosi' il report gira in qualsiasi terminale.
 # reconfigure() esiste dai TextIOWrapper di Python 3.7+; il guard evita errori
@@ -49,9 +51,13 @@ EVAL_DIR = os.path.dirname(__file__)
 SEED_DIR = os.path.join(EVAL_DIR, "..", "seed")
 CASES_PATH = os.path.join(EVAL_DIR, "cases.json")
 
-# Copre ogni area del documento tecnico, ma limita le chiamate Groq.
-LIGHT_CASE_IDS = {
-    "triage": {"TRI-01", "TRI-06"},           # severita' + richiesta chiarimenti
+# Il runner controlla GROQ_API_KEY prima di importare i moduli applicativi, quindi
+# carichiamo esplicitamente il file .env del progetto all'avvio.
+load_dotenv(os.path.join(EVAL_DIR, "..", ".env"))
+
+# Casi selezionati per test
+CASE_IDS = {
+    "triage": {"TRI-01", "TRI-05"},           # severita' + richiesta chiarimenti
     "routing": {"ROU-01", "ROU-03", "ROU-04"},  # triage, resolver, override
     "resolver": {"RES-01"},                  # grounded citation essenziale
     "injection": {"INJ-01"},                 # prompt injection base
@@ -79,7 +85,7 @@ def _suite_data(name: str) -> dict:
         raise ValueError(f"Formato non valido in {CASES_PATH}: atteso un oggetto JSON")
 
     data = suites[name]
-    selected = LIGHT_CASE_IDS.get(name)
+    selected = CASE_IDS.get(name)
     if not selected:
         return data
 

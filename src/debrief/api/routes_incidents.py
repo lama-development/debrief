@@ -72,7 +72,7 @@ def resolve(incident_id: str, body: ResolveRequest, user: dict = Depends(auth.cu
     """Chiude l'incidente e lancia il loop di apprendimento."""
     _require_incident(incident_id, user["id"])
     try:
-        return service.resolve_incident(incident_id, body.resolution_summary, user["username"])
+        return service.resolve_incident(incident_id, body.resolution_summary, user["id"])
     except ValueError as e:
         # Il service solleva ValueError se la transizione di stato non è valida → 409.
         raise HTTPException(status_code=409, detail=str(e))

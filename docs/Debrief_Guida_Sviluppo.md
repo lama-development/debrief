@@ -51,7 +51,6 @@ debrief/
 │   └── run_seed.py              # popola SQLite + LanceDB
 ├── eval/
 │   ├── cases.json               # pochi casi rappresentativi per tutte le suite AI
-│   ├── smoke_demo.py            # demo end-to-end su database temporanei
 │   ├── run_eval.py              # unico runner delle metriche AI (`uv run eval`)
 │   └── __init__.py
 ├── frontend/                    # React + shadcn (ULTIMO)

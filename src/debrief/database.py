@@ -452,10 +452,16 @@ def get_timeline(incident_id: str, db_path: str | None = None) -> list[dict]:
     try:
         # ORDER BY id ASC → ordine crescente = cronologico (l'id auto-incrementa).
         rows = conn.execute(
-            """SELECT e.*, u.username AS actor_username, u.team_id AS actor_team_id,
+            """SELECT e.*, u.id AS actor_user_id, u.username AS actor_username,
+                      u.team_id AS actor_team_id,
                       t.name AS actor_team_name
                FROM timeline_events AS e
-               LEFT JOIN users AS u ON u.id = e.actor
+               LEFT JOIN users AS u
+                 ON u.id = e.actor
+                 OR (
+                      u.username = e.actor
+                      AND NOT EXISTS (SELECT 1 FROM users AS actor_by_id WHERE actor_by_id.id = e.actor)
+                    )
                LEFT JOIN teams AS t ON t.id = u.team_id
                WHERE e.incident_id = ? ORDER BY e.id ASC""",
             (incident_id,),
