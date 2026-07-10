@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -7,6 +8,7 @@ import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useIncidents } from "@/hooks/useIncidents";
 import { useMetrics } from "@/hooks/useMetrics";
 import { ALL_STATUSES, STATUS_LABEL, formatDateTime, formatMttr } from "@/lib/labels";
@@ -19,11 +21,24 @@ const OPEN_STATUSES: IncidentStatus[] = ["open", "active"];
 const TH = "h-12 px-4 text-left align-middle font-medium text-muted-foreground";
 const TD = "p-4 align-middle";
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({
+  title,
+  value,
+  description,
+}: {
+  title: string;
+  value: string | number;
+  description: string;
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          {title}
+          <Tooltip content={description}>
+            <Info className="size-3.5 cursor-help" aria-hidden="true" />
+          </Tooltip>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-semibold">{value}</div>
@@ -57,10 +72,26 @@ export function DashboardPage() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
           ) : (
             <>
-              <StatCard title="Totale incidenti" value={metrics.data?.total ?? 0} />
-              <StatCard title="In corso" value={openCount} />
-              <StatCard title="Risolti" value={resolvedCount} />
-              <StatCard title="MTTR medio" value={formatMttr(metrics.data?.mttr_seconds ?? null)} />
+              <StatCard
+                title="Totale incidenti"
+                value={metrics.data?.total ?? 0}
+                description="Numero complessivo di incidenti registrati."
+              />
+              <StatCard
+                title="In corso"
+                value={openCount}
+                description="Incidenti aperti o attualmente in gestione."
+              />
+              <StatCard
+                title="Risolti"
+                value={resolvedCount}
+                description="Incidenti che sono stati contrassegnati come risolti."
+              />
+              <StatCard
+                title="MTTR medio"
+                value={formatMttr(metrics.data?.mttr_seconds ?? null)}
+                description="Tempo medio impiegato per risolvere un incidente (Mean Time To Resolution)."
+              />
             </>
           )}
         </div>

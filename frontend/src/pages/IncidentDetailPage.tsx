@@ -45,7 +45,7 @@ function SeverityDropdown({
       ariaLabel="Cambia severità"
       className="w-fit"
       triggerClassName={cn(
-        "h-auto w-auto rounded-full px-2.5 py-0.5 font-semibold shadow-sm",
+        "h-auto w-auto gap-1 rounded-full px-2.5 py-0.5 font-semibold shadow-sm",
         SEVERITY_CLASS[value],
       )}
       menuClassName="min-w-[96px]"

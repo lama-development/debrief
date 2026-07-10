@@ -1,8 +1,8 @@
 import {
-  CheckCircle2,
   ClipboardCheck,
   Flag,
   Pencil,
+  RotateCcw,
   ShieldAlert,
   Wrench,
   type LucideIcon,
@@ -10,8 +10,19 @@ import {
 
 import { formatDateTime } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import { AGENT_IDENTITY, DECLARED_CLS } from "@/lib/agents";
+import { AGENT_IDENTITY } from "@/lib/agents";
 import type { TimelineEvent } from "@/lib/types";
+
+const BOT_ACTORS = new Set(["triage", "investigator", "resolver", "debrief"]);
+const HUMAN_CLS = "border-border bg-muted text-muted-foreground";
+const START_CLS =
+  "border-rose-200 bg-rose-100 text-rose-600 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-400";
+const RESOLVED_CLS =
+  "border-emerald-200 bg-emerald-100 text-emerald-600 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-400";
+
+function actorCls(actor: string | null) {
+  return BOT_ACTORS.has(actor ?? "") ? AGENT_IDENTITY.debrief.timelineCls : HUMAN_CLS;
+}
 
 // Un milestone è un FATTO saliente del ciclo di vita (non un messaggio di chat).
 interface Milestone {
@@ -44,7 +55,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
         time: ev.timestamp,
         label: "Incidente dichiarato",
         icon: Flag,
-        cls: DECLARED_CLS,
+        cls: START_CLS,
       });
       return;
     }
@@ -56,7 +67,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           label: "Classificato dal triage",
           detail: triageTeams || undefined,
           icon: ClipboardCheck,
-          cls: AGENT_IDENTITY.triage.timelineCls,
+          cls: actorCls(ev.actor),
         });
         break;
       // involvement e disinvolvement individuali: il triage li aggrega sopra,
@@ -85,7 +96,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           label: `Classificazione modificata da ${ev.actor ?? "utente"}`,
           detail,
           icon: Pencil,
-          cls: DECLARED_CLS,
+          cls: actorCls(ev.actor),
         });
         break;
       }
@@ -95,7 +106,16 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           time: ev.timestamp,
           label: "Escalation a intervento umano",
           icon: ShieldAlert,
-          cls: DECLARED_CLS,
+          cls: actorCls(ev.actor),
+        });
+        break;
+      case "reopen":
+        out.push({
+          key: `${ev.id}`,
+          time: ev.timestamp,
+          label: `Incidente riaperto da ${ev.actor_username ?? ev.actor ?? "utente"}`,
+          icon: RotateCcw,
+          cls: actorCls(ev.actor),
         });
         break;
       case "resolution":
@@ -106,15 +126,15 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
             time: ev.timestamp,
             label: "Soluzione proposta dal resolver",
             icon: Wrench,
-            cls: AGENT_IDENTITY.resolver.timelineCls,
+            cls: actorCls(ev.actor),
           });
         } else {
           out.push({
             key: `${ev.id}`,
             time: ev.timestamp,
             label: "Incidente risolto",
-            icon: CheckCircle2,
-            cls: AGENT_IDENTITY.resolver.timelineCls,
+            icon: Flag,
+            cls: RESOLVED_CLS,
           });
         }
         break;
