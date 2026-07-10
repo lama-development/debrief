@@ -17,10 +17,10 @@ def _headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _register(client, username: str) -> str:
+def _register(client, username: str, team_id: str) -> str:
     response = client.post(
         "/auth/register",
-        json={"username": username, "password": "demo-password"},
+        json={"username": username, "password": "demo-password", "team_id": team_id},
     )
     response.raise_for_status()
     return response.json()["token"]
@@ -52,8 +52,8 @@ def main() -> None:
         from debrief.api.app import app
 
         with TestClient(app) as client:
-            alice = _register(client, "demo-alice")
-            bob = _register(client, "demo-bob")
+            alice = _register(client, "demo-alice", "IT_INTERNAL")
+            bob = _register(client, "demo-bob", "IT_EXTERNAL")
             created = client.post(
                 "/incidents",
                 json={
@@ -68,6 +68,15 @@ def main() -> None:
             incident_id = created.json()["id"]
 
             assert client.get("/incidents", headers=_headers(bob)).json() == []
+            denied = client.get(f"/incidents/{incident_id}", headers=_headers(bob))
+            assert denied.status_code == 404
+
+            involved = client.patch(
+                f"/incidents/{incident_id}/classification",
+                json={"add_teams": ["IT_EXTERNAL"]},
+                headers=_headers(alice),
+            )
+            involved.raise_for_status()
             joined = client.get(f"/incidents/{incident_id}", headers=_headers(bob))
             joined.raise_for_status()
             assert {p["username"] for p in joined.json()["participants"]} == {

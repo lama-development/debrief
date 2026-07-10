@@ -31,6 +31,8 @@ class HumanSolutionRequest(BaseModel):
 def _require_incident(incident_id: str, user_id: str | None = None) -> dict:
     """Restituisce il dettaglio dell'incidente o solleva 404."""
     # Helper riusato da più route: centralizza il controllo "esiste?" → 404.
+    if user_id is not None and not service.can_access_incident(incident_id, user_id):
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
     detail = service.get_incident_detail(incident_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")

@@ -74,7 +74,11 @@ npm install # solo la prima volta
 npm run dev
 ```
 
-Apri `http://localhost:5173`, registra un utente, dichiara un incidente e chatta con gli agenti.
+Apri `http://localhost:5173`, registra un utente scegliendo il suo team, dichiara un
+incidente e chatta con gli agenti. Per mostrare la collaborazione multi-utente nella
+demo, registra una seconda utenza appartenente a uno dei team coinvolti: vedrà
+l'incidente nella propria dashboard e in chat i messaggi umani resteranno distinti
+per username e team.
 
 > [!TIP]
 > Per puntare a un backend diverso, modifica `API_URL` in `frontend/src/lib/api.ts`.

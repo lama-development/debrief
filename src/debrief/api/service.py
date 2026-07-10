@@ -368,6 +368,10 @@ def list_incidents(user_id: str, status: str | None = None, limit: int = 100) ->
     return db.list_user_incidents(user_id, status=status, limit=limit)
 
 
+def can_access_incident(incident_id: str, user_id: str) -> bool:
+    return db.user_can_access_incident(user_id, incident_id)
+
+
 def join_incident(incident_id: str, user_id: str) -> None:
     """Associa un utente autenticato a una conversazione esistente."""
     if db.get_incident(incident_id) is None:
@@ -590,5 +594,4 @@ def capture_human_solution(incident_id: str, solution_text: str,
         "solution": solution_text,
         "provided_by": provided_by,
     }
-
 

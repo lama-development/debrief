@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { authApi, getAuthToken, setAuthToken, setUnauthorizedHandler } from "@/lib/api";
 import type { User } from "@/lib/types";
@@ -7,13 +8,14 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean; // true mentre validiamo un token salvato all'avvio
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, teamId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(() => Boolean(getAuthToken()));
 
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(() => {
       setAuthToken(null);
       setUser(null);
+      queryClient.clear();
     });
 
     const token = getAuthToken();
@@ -38,18 +41,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => setLoading(false));
 
     return () => setUnauthorizedHandler(null);
-  }, []);
+  }, [queryClient]);
 
   async function login(username: string, password: string) {
     const { token } = await authApi.login(username, password);
     setAuthToken(token);
     const me = await authApi.me();
+    queryClient.clear();
     setUser(me);
   }
 
-  async function register(username: string, password: string) {
-    const { user: newUser, token } = await authApi.register(username, password);
+  async function register(username: string, password: string, teamId: string) {
+    const { user: newUser, token } = await authApi.register(username, password, teamId);
     setAuthToken(token);
+    queryClient.clear();
     setUser(newUser);
   }
 
@@ -61,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setAuthToken(null);
     setUser(null);
+    queryClient.clear();
   }
 
   return (

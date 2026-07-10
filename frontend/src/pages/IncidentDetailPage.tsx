@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, Plus, X } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Timeline } from "@/components/Timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels";
 import { useIncident, useReopenIncident } from "@/hooks/useIncident";
@@ -31,59 +32,25 @@ function SeverityDropdown({
   disabled: boolean;
   onChange: (s: Severity) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
-
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Cambia severità"
-        title={SEVERITY_TOOLTIP[value]}
-        className={cn(
-          "inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-sm font-semibold shadow-sm disabled:opacity-50",
-          SEVERITY_CLASS[value],
-        )}
-      >
-        {value}
-        <ChevronDown className="h-3 w-3 opacity-70" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[80px] rounded-md border bg-background p-1 shadow-md">
-          {ALL_SEVERITIES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              disabled={disabled}
-              onClick={() => {
-                onChange(s);
-                setOpen(false);
-              }}
-              title={SEVERITY_TOOLTIP[s]}
-              className={cn(
-                "w-full rounded px-2 py-1.5 text-left text-sm disabled:opacity-50",
-                s === value ? "font-semibold text-foreground" : "hover:bg-muted",
-              )}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+    <Select
+      value={value}
+      options={ALL_SEVERITIES.map((severity) => ({
+        value: severity,
+        label: severity,
+        title: SEVERITY_TOOLTIP[severity],
+      }))}
+      onChange={onChange}
+      disabled={disabled}
+      ariaLabel="Cambia severità"
+      className="w-fit"
+      triggerClassName={cn(
+        "h-auto w-auto rounded-full px-2.5 py-0.5 font-semibold shadow-sm",
+        SEVERITY_CLASS[value],
       )}
-    </div>
+      menuClassName="min-w-[96px]"
+      showCheck={false}
+    />
   );
 }
 
@@ -185,14 +152,14 @@ export function IncidentDetailPage() {
       <AppHeader />
 
       {/* Intestazione incidente */}
-      <div className="container relative z-20 pt-4">
-        <Card className="px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="container relative z-20 pt-2 sm:pt-4">
+        <Card className="px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
             <Button
               asChild
               variant="ghost"
               size="icon"
-              className="shrink-0"
+              className="-ml-1 h-9 w-9 shrink-0 sm:ml-0 sm:h-10 sm:w-10"
               aria-label="Torna alla dashboard"
             >
               <Link to="/">
@@ -200,11 +167,11 @@ export function IncidentDetailPage() {
               </Link>
             </Button>
             <div className="min-w-0 flex-1">
-              <h1 className="line-clamp-2 text-base font-semibold leading-tight tracking-tight">
+              <h1 className="truncate text-base font-semibold leading-tight tracking-tight">
                 {incident.title}
               </h1>
-              <div className="mt-1.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 sm:mt-1.5 sm:flex-nowrap">
+                <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={incident.status} />
                   {canOverride && incident.severity ? (
                     <SeverityDropdown
@@ -217,7 +184,7 @@ export function IncidentDetailPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:hidden">
-                  {canResolve && <ResolveDialog incidentId={incident.id} />}
+                  {canResolve && <ResolveDialog incidentId={incident.id} triggerSize="sm" />}
                   {isResolved && (
                     <Button
                       variant="outline"
@@ -244,7 +211,7 @@ export function IncidentDetailPage() {
       </div>
 
       {/* Due pannelli: dettaglio (sinistra) + chat (destra) */}
-      <div className="container flex min-h-0 flex-1 flex-col gap-4 py-4">
+      <div className="container flex min-h-0 flex-1 flex-col gap-2 py-2 sm:gap-4 sm:py-4">
         {/* Selettore tab — visibile solo sotto lg */}
         <div className="flex rounded-lg bg-muted p-1 text-sm font-medium lg:hidden">
           <button
@@ -273,7 +240,7 @@ export function IncidentDetailPage() {
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-4 lg:grid-cols-[2fr_3fr]">
           {/* Sinistra: descrizione, timeline e debriefing */}
           <div
             className={cn(
@@ -392,7 +359,7 @@ export function IncidentDetailPage() {
           {/* Destra: chat */}
           <Card
             className={cn(
-              "flex min-h-0 flex-col overflow-hidden",
+              "-mx-4 flex min-h-0 flex-col overflow-hidden rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x",
               mobileTab !== "chat" && "hidden lg:flex",
             )}
           >

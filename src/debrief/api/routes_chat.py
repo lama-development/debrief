@@ -26,7 +26,7 @@ def chat(incident_id: str, body: ChatRequest, user: dict = Depends(auth.current_
     dell'agente. Eventi SSE: routing | tool | token | triage | done | error."""
     # 404 pulito PRIMA di iniziare lo streaming: una volta partita la risposta in
     # streaming, lo status code HTTP è già stato inviato e non si può più cambiare.
-    if service.get_incident_detail(incident_id) is None:
+    if not service.can_access_incident(incident_id, user["id"]):
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
     service.join_incident(incident_id, user["id"])
 

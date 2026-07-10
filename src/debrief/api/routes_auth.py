@@ -10,6 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
 from debrief import auth
+from debrief import database as db
 
 # APIRouter raggruppa endpoint correlati. prefix="/auth" → tutte le route qui
 # iniziano con /auth (es. /auth/login). tags=[...] le raggruppa nella doc /docs.
@@ -24,6 +25,7 @@ _bearer = HTTPBearer(auto_error=False)
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=1)   # min_length=1 → non può essere vuoto
     password: str = Field(min_length=1)
+    team_id: str = Field(min_length=1)
 
 
 class LoginRequest(BaseModel):
@@ -37,7 +39,7 @@ def register(body: RegisterRequest):
     # `body: RegisterRequest` → FastAPI legge il JSON, lo valida e ce lo passa già
     # come oggetto tipizzato. Accediamo ai campi con body.username, body.password.
     try:
-        user = auth.register_user(body.username, body.password)
+        user = auth.register_user(body.username, body.password, body.team_id)
     except ValueError as e:
         # auth solleva ValueError se lo username è già preso → lo traduciamo in
         # un errore HTTP 409 Conflict. str(e) è il messaggio dell'eccezione.
@@ -75,3 +77,10 @@ def me(user: dict = Depends(auth.current_user)):
     # Depends(current_user) fa tutto il lavoro: se il token è valido, `user`
     # contiene già l'utente; altrimenti la richiesta è stata respinta con 401.
     return user
+
+
+@router.get("/teams")
+def teams():
+    """Catalogo pubblico necessario per scegliere il team in registrazione."""
+    catalog, _ = db.get_teams()
+    return catalog

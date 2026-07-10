@@ -58,11 +58,11 @@ def _sanitize(user: dict) -> dict:
 
 # --- Registrazione / login / logout ---
 
-def register_user(username: str, password: str) -> dict:
+def register_user(username: str, password: str, team_id: str) -> dict:
     """Crea un nuovo utente. Solleva ValueError se lo username è già preso."""
     # uuid.uuid4().hex = id casuale univoco come stringa esadecimale.
     # Salviamo l'hash, mai la password in chiaro.
-    user = db.create_user(uuid.uuid4().hex, username, hash_password(password))
+    user = db.create_user(uuid.uuid4().hex, username, hash_password(password), team_id)
     return _sanitize(user)
 
 

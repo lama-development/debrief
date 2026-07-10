@@ -15,9 +15,18 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ButtonProps } from "@/components/ui/button";
 
 // Dialog di chiusura incidente: richiede soltanto il riepilogo della risoluzione.
-export function ResolveDialog({ incidentId }: { incidentId: string }) {
+export function ResolveDialog({
+  incidentId,
+  triggerSize,
+  triggerClassName,
+}: {
+  incidentId: string;
+  triggerSize?: ButtonProps["size"];
+  triggerClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
   const resolve = useResolveIncident(incidentId);
@@ -38,7 +47,9 @@ export function ResolveDialog({ incidentId }: { incidentId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Risolvi</Button>
+        <Button size={triggerSize} className={triggerClassName}>
+          Risolvi
+        </Button>
       </DialogTrigger>
       <DialogContent className="bg-card shadow-2xl">
         <DialogHeader className="space-y-3">

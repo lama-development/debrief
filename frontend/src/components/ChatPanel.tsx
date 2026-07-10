@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Bot, ExternalLink, Loader2, Search, Send, User as UserIcon } from "lucide-react";
+import { Bot, ExternalLink, Hash, Loader2, Search, Send, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { OverrideConfirmCard } from "@/components/OverrideConfirmCard";
+import { useAuth } from "@/auth/AuthContext";
 import { TriageCard } from "@/components/TriageCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,9 @@ interface ChatMessage {
   role: "user" | "assistant";
   agent?: string;
   content: string;
+  senderId?: string;
+  senderUsername?: string;
+  senderTeam?: string;
   triage?: TriageData;
   overrideProposal?: OverrideProposal;
   humanHelp?: HumanHelpRequest;
@@ -71,6 +75,9 @@ function seedMessages(events: TimelineEvent[]): ChatMessage[] {
       id: ev.id,
       role: isAssistant ? "assistant" : "user",
       agent: isAssistant ? (ev.actor ?? undefined) : undefined,
+      senderId: isAssistant ? undefined : (ev.actor ?? undefined),
+      senderUsername: isAssistant ? undefined : (ev.actor_username ?? ev.actor ?? "Utente"),
+      senderTeam: isAssistant ? undefined : (ev.actor_team_name ?? undefined),
       content: ev.content ?? "",
     });
   });
@@ -92,6 +99,7 @@ export function ChatPanel({
   onTurnComplete: () => void;
   onClassificationChanged?: () => void;
 }) {
+  const { user } = useAuth();
   // Seed una volta sola al mount (il parent passa key={incidentId} -> remount per incidente).
   const [messages, setMessages] = useState<ChatMessage[]>(() => seedMessages(initialEvents));
   const [input, setInput] = useState("");
@@ -137,7 +145,14 @@ export function ChatPanel({
     const text = (textArg ?? input).trim();
     if (!text || streaming) return;
 
-    const userMsg: ChatMessage = { id: nextLocalId.current--, role: "user", content: text };
+    const userMsg: ChatMessage = {
+      id: nextLocalId.current--,
+      role: "user",
+      content: text,
+      senderId: user?.id,
+      senderUsername: user?.username,
+      senderTeam: user?.team_name,
+    };
     const assistantId = nextLocalId.current--;
     activeAssistantId.current = assistantId;
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }]);
@@ -244,8 +259,19 @@ export function ChatPanel({
 
   return (
     <div className="relative flex h-full flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 sm:px-4 sm:py-2.5">
+        <span className="text-sm font-medium">Chat incidente</span>
+        <span className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground">
+          <Hash className="h-3.5 w-3.5" aria-hidden="true" />
+          {incidentId}
+        </span>
+      </div>
+
       {/* Cronologia */}
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 pb-24">
+      <div
+        ref={scrollRef}
+        className="flex-1 space-y-3 overflow-y-auto px-3 py-3 pb-20 sm:space-y-4 sm:p-4 sm:pb-24"
+      >
         {messages.length === 0 && (
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Invia un messaggio per avviare il triage dell'incidente.
@@ -258,20 +284,21 @@ export function ChatPanel({
             incidentId={incidentId}
             onOverrideConfirm={handleOverrideConfirm}
             overridePending={overridePending}
+            currentUserId={user?.id}
           />
         ))}
         {activeTool && <ToolBubble agent={activeAgent} />}
       </div>
 
       {/* Input floating */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 via-60% to-transparent px-3 pb-3 pt-8">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 via-60% to-transparent px-2 pb-2 pt-6 sm:px-3 sm:pb-3 sm:pt-8">
         <form onSubmit={onSubmit}>
           {closed ? (
             <p className="py-1 text-center text-sm text-muted-foreground">
               Incidente chiuso. Riaprilo per continuare la conversazione.
             </p>
           ) : (
-            <div className="flex items-center gap-2 rounded-lg border bg-background/80 px-3 py-2 shadow-lg">
+            <div className="flex items-center gap-2 rounded-lg border bg-background/80 px-2.5 py-1.5 shadow-lg sm:px-3 sm:py-2">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -312,7 +339,7 @@ function ToolBubble({ agent }: { agent: string | null }) {
     <div className="flex gap-2">
       <span
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8",
           identity.iconCls,
         )}
       >
@@ -336,17 +363,20 @@ function MessageBubble({
   incidentId,
   onOverrideConfirm,
   overridePending,
+  currentUserId,
 }: {
   message: ChatMessage;
   incidentId: string;
   onOverrideConfirm: (msgId: number) => void;
   overridePending: boolean;
+  currentUserId?: string;
 }) {
   const [dismissed, setDismissed] = useState(message.overrideDismissed ?? false);
   const isUser = message.role === "user";
+  const isOwn = isUser && message.senderId === currentUserId;
   const identity = getAgentIdentity(message.agent);
   return (
-    <div className={cn("flex gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("flex gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
       <span
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
@@ -357,7 +387,18 @@ function MessageBubble({
       >
         {isUser ? <UserIcon className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </span>
-      <div className={cn("max-w-[80%] space-y-2", isUser ? "items-end" : "items-start")}>
+      <div
+        className={cn(
+          "max-w-[calc(100%-2.25rem)] space-y-2 sm:max-w-[80%]",
+          isOwn ? "items-end" : "items-start",
+        )}
+      >
+        {isUser && (
+          <div className={cn("text-xs text-muted-foreground", isOwn && "text-right")}>
+            <span className="font-medium text-foreground">{message.senderUsername}</span>
+            {message.senderTeam && <> · {message.senderTeam}</>}
+          </div>
+        )}
         {!isUser && message.agent && message.agent !== "override" && (
           <div className="text-sm font-medium text-muted-foreground">{identity.label}</div>
         )}
@@ -376,14 +417,19 @@ function MessageBubble({
             className={cn(
               "inline-block rounded-lg px-3 py-2 text-sm shadow-sm",
               isUser
-                ? "whitespace-pre-wrap border border-primary/30 bg-primary/15 text-foreground"
+                ? cn(
+                    "whitespace-pre-wrap text-foreground",
+                    isOwn
+                      ? "border border-primary/30 bg-primary/15"
+                      : "border border-amber-500/25 bg-amber-500/10",
+                  )
                 : identity.bubbleCls,
             )}
           >
             {isUser ? (
               message.content
             ) : (
-              <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:my-2 prose-p:my-1 prose-code:text-sm prose-pre:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0">
+              <div className="prose prose-sm max-w-none leading-5 dark:prose-invert prose-headings:mb-1 prose-headings:mt-4 prose-headings:leading-tight prose-p:my-1 prose-p:leading-5 prose-blockquote:my-2 prose-code:text-sm prose-pre:my-1.5 prose-ol:my-1 prose-ol:pl-5 prose-ul:my-1 prose-ul:pl-5 prose-li:my-0 prose-li:leading-5 prose-table:my-2 prose-hr:my-3 [&>:first-child]:mt-0 [&_li+li]:mt-0.5 [&_li>p]:my-0">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{

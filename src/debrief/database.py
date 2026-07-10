@@ -49,11 +49,20 @@ def create_tables(conn: sqlite3.Connection):
     # significa che richiamare questa funzione più volte è sicuro: le tabelle
     # già presenti non vengono ricreate né cancellate (= idempotente).
     conn.executescript("""
+        CREATE TABLE IF NOT EXISTS teams (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            description TEXT,
+            contact_info TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS users (
             id          TEXT PRIMARY KEY,
             username    TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at  TEXT DEFAULT (datetime('now'))
+            team_id     TEXT NOT NULL,
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (team_id) REFERENCES teams(id)
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -61,13 +70,6 @@ def create_tables(conn: sqlite3.Connection):
             user_id     TEXT NOT NULL,
             created_at  TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS teams (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            description TEXT,
-            contact_info TEXT
         );
 
         CREATE TABLE IF NOT EXISTS incidents (
@@ -145,7 +147,16 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
+    valid_team_ids = {
+        row["id"] for row in conn.execute("SELECT id FROM teams").fetchall()
+    }
+
     for inc in incidents:
+        unknown_teams = set(inc.get("involved_teams", [])) - valid_team_ids
+        if unknown_teams:
+            raise ValueError(
+                f"Incident {inc['id']} references unknown teams: {sorted(unknown_teams)}"
+            )
         status = inc.get("status", "resolved")
         # resolved_at ha senso solo per gli incidenti chiusi.
         resolved_at = inc.get("resolved_at", "") if status == "resolved" else None
@@ -157,6 +168,21 @@ def load_incidents(conn: sqlite3.Connection, incidents_path: str):
             inc.get("severity"), status,
             inc["created_at"], resolved_at)
         )
+
+        # Gli incidenti storici non hanno un singolo creatore: il seed dichiara
+        # esplicitamente quali team possono consultarli. La cancellazione rende
+        # il caricamento ripetibile senza duplicare gli eventi di coinvolgimento.
+        conn.execute(
+            """DELETE FROM timeline_events
+               WHERE incident_id = ? AND event_type IN ('involvement', 'disinvolvement')""",
+            (inc["id"],),
+        )
+        for team_id in inc.get("involved_teams", []):
+            conn.execute(
+                """INSERT INTO timeline_events (incident_id, event_type, actor, content)
+                   VALUES (?, 'involvement', 'seed', ?)""",
+                (inc["id"], team_id),
+            )
 
         if status == "resolved":
             debrief_report = {
@@ -256,11 +282,23 @@ def get_incident(incident_id: str, db_path: str | None = None) -> dict | None:
 
 def list_user_incidents(user_id: str, status: str | None = None, limit: int = 100,
                         db_path: str | None = None) -> list[dict]:
-    """Elenca le conversazioni a cui l'utente ha partecipato, più i seed pubblici."""
+    """Elenca solo incidenti creati, partecipati o assegnati al team dell'utente."""
     conn = get_connection(db_path)
     try:
-        filters = ["(p.user_id = ? OR i.created_by = ? OR i.created_by IS NULL)"]
-        params: list[object] = [user_id, user_id]
+        filters = ["""(p.user_id = ? OR i.created_by = ? OR EXISTS (
+            SELECT 1 FROM users AS viewer
+            JOIN timeline_events AS te ON te.incident_id = i.id
+            WHERE viewer.id = ? AND viewer.team_id IS NOT NULL
+              AND te.event_type = 'involvement' AND te.content = viewer.team_id
+              AND NOT EXISTS (
+                SELECT 1 FROM timeline_events AS removed
+                WHERE removed.incident_id = i.id
+                  AND removed.event_type = 'disinvolvement'
+                  AND removed.content = viewer.team_id
+                  AND removed.id > te.id
+              )
+        ))"""]
+        params: list[object] = [user_id, user_id, user_id]
         if status:
             filters.append("i.status = ?")
             params.append(status)
@@ -301,9 +339,11 @@ def get_incident_participants(incident_id: str, db_path: str | None = None) -> l
     conn = get_connection(db_path)
     try:
         rows = conn.execute(
-            """SELECT u.id, u.username, p.joined_at, p.last_activity_at
+            """SELECT u.id, u.username, u.team_id, t.name AS team_name,
+                      p.joined_at, p.last_activity_at
                FROM incident_participants AS p
                JOIN users AS u ON u.id = p.user_id
+               LEFT JOIN teams AS t ON t.id = u.team_id
                WHERE p.incident_id = ?
                ORDER BY p.joined_at ASC, u.username ASC""",
             (incident_id,),
@@ -412,7 +452,12 @@ def get_timeline(incident_id: str, db_path: str | None = None) -> list[dict]:
     try:
         # ORDER BY id ASC → ordine crescente = cronologico (l'id auto-incrementa).
         rows = conn.execute(
-            "SELECT * FROM timeline_events WHERE incident_id = ? ORDER BY id ASC",
+            """SELECT e.*, u.username AS actor_username, u.team_id AS actor_team_id,
+                      t.name AS actor_team_name
+               FROM timeline_events AS e
+               LEFT JOIN users AS u ON u.id = e.actor
+               LEFT JOIN teams AS t ON t.id = u.team_id
+               WHERE e.incident_id = ? ORDER BY e.id ASC""",
             (incident_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -465,16 +510,24 @@ def get_teams(db_path: str | None = None) -> tuple[list[dict], set[str]]:
 
 # --- Utenti e sessioni (auth) ---
 
-def create_user(user_id: str, username: str, password_hash: str, db_path: str | None = None) -> dict:
+def create_user(user_id: str, username: str, password_hash: str, team_id: str,
+                db_path: str | None = None) -> dict:
     """Crea un utente. Solleva ValueError se lo username è già preso."""
     conn = get_connection(db_path)
     try:
+        team = conn.execute("SELECT id FROM teams WHERE id = ?", (team_id,)).fetchone()
+        if team is None:
+            raise ValueError(f"Team '{team_id}' not found")
         conn.execute(
-            "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
-            (user_id, username, password_hash),
+            "INSERT INTO users (id, username, password_hash, team_id) VALUES (?, ?, ?, ?)",
+            (user_id, username, password_hash, team_id),
         )
         conn.commit()
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            """SELECT u.*, t.name AS team_name FROM users u
+               LEFT JOIN teams t ON t.id = u.team_id WHERE u.id = ?""",
+            (user_id,),
+        ).fetchone()
         return dict(row)
     except sqlite3.IntegrityError:
         # Lo username ha il vincolo UNIQUE nella tabella: se è duplicato SQLite
@@ -488,7 +541,11 @@ def create_user(user_id: str, username: str, password_hash: str, db_path: str | 
 def get_user_by_username(username: str, db_path: str | None = None) -> dict | None:
     conn = get_connection(db_path)
     try:
-        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        row = conn.execute(
+            """SELECT u.*, t.name AS team_name FROM users u
+               LEFT JOIN teams t ON t.id = u.team_id WHERE u.username = ?""",
+            (username,),
+        ).fetchone()
         return dict(row) if row else None
     finally:
         conn.close()
@@ -497,8 +554,44 @@ def get_user_by_username(username: str, db_path: str | None = None) -> dict | No
 def get_user_by_id(user_id: str, db_path: str | None = None) -> dict | None:
     conn = get_connection(db_path)
     try:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute(
+            """SELECT u.*, t.name AS team_name FROM users u
+               LEFT JOIN teams t ON t.id = u.team_id WHERE u.id = ?""",
+            (user_id,),
+        ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def user_can_access_incident(user_id: str, incident_id: str,
+                             db_path: str | None = None) -> bool:
+    """Autorizza creatore, partecipanti espliciti e membri di team coinvolti."""
+    conn = get_connection(db_path)
+    try:
+        row = conn.execute(
+            """SELECT 1
+               FROM incidents AS i
+               JOIN users AS u ON u.id = ?
+               WHERE i.id = ? AND (
+                 i.created_by = u.id OR
+                 EXISTS (SELECT 1 FROM incident_participants p
+                         WHERE p.incident_id = i.id AND p.user_id = u.id) OR
+                 (u.team_id IS NOT NULL AND EXISTS (
+                   SELECT 1 FROM timeline_events te
+                   WHERE te.incident_id = i.id AND te.event_type = 'involvement'
+                     AND te.content = u.team_id
+                     AND NOT EXISTS (
+                       SELECT 1 FROM timeline_events removed
+                       WHERE removed.incident_id = i.id
+                         AND removed.event_type = 'disinvolvement'
+                         AND removed.content = u.team_id AND removed.id > te.id
+                     )
+                 ))
+               )""",
+            (user_id, incident_id),
+        ).fetchone()
+        return row is not None
     finally:
         conn.close()
 

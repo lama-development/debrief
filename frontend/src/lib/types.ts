@@ -10,7 +10,15 @@ export type AgentRole = "triage" | "investigator" | "resolver" | "none";
 export interface User {
   id: string;
   username: string;
+  team_id: string;
+  team_name: string;
   created_at?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface Incident {
@@ -32,6 +40,9 @@ export interface TimelineEvent {
   // "message" | "triage" | "escalation" | "resolution" | "involvement"
   event_type: string;
   actor: string | null;
+  actor_username: string | null;
+  actor_team_id: string | null;
+  actor_team_name: string | null;
   content: string | null;
 }
 
@@ -46,6 +57,8 @@ export interface DebriefReport {
 export interface IncidentParticipant {
   id: string;
   username: string;
+  team_id: string;
+  team_name: string;
   joined_at: string;
   last_activity_at: string;
 }

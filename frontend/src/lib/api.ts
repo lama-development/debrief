@@ -8,6 +8,7 @@ import type {
   Incident,
   IncidentDetail,
   Metrics,
+  Team,
   User,
 } from "@/lib/types";
 
@@ -98,10 +99,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 // --- Auth ---
 export const authApi = {
-  register: (username: string, password: string) =>
+  register: (username: string, password: string, team_id: string) =>
     request<{ user: User; token: string }>("/auth/register", {
       method: "POST",
-      body: { username, password },
+      body: { username, password, team_id },
       auth: false,
     }),
   login: (username: string, password: string) =>
@@ -112,6 +113,7 @@ export const authApi = {
     }),
   me: () => request<User>("/auth/me"),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
+  teams: () => request<Team[]>("/auth/teams", { auth: false }),
 };
 
 // --- Incidenti ---

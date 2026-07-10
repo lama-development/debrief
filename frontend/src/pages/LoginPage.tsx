@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/auth/AuthContext";
-import { ApiError } from "@/lib/api";
+import { ApiError, authApi } from "@/lib/api";
+import type { Team } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -21,17 +23,32 @@ export function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [teams, setTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    authApi
+      .teams()
+      .then(setTeams)
+      .catch(() => setError("Impossibile caricare i team."));
+  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      if (mode === "login") await login(username, password);
-      else await register(username, password);
-      navigate(from, { replace: true });
+      if (mode === "login") {
+        await login(username, password);
+        navigate(from, { replace: true });
+      } else {
+        await register(username, password, teamId);
+        // Un account appena creato può non avere accesso alla pagina richiesta
+        // dalla sessione precedente: parte sempre dalla propria dashboard.
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Errore inatteso. Riprova.");
     } finally {
@@ -61,6 +78,19 @@ export function LoginPage() {
                 required
               />
             </div>
+            {mode === "register" && (
+              <div className="space-y-2">
+                <Label htmlFor="team">Team</Label>
+                <Select
+                  id="team"
+                  value={teamId}
+                  onChange={setTeamId}
+                  options={teams.map((team) => ({ value: team.id, label: team.name }))}
+                  placeholder="Seleziona il tuo team…"
+                  ariaLabel="Seleziona il tuo team"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -75,7 +105,11 @@ export function LoginPage() {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={submitting || (mode === "register" && !teamId)}
+            >
               {submitting ? "Attendi…" : mode === "login" ? "Accedi" : "Registrati"}
             </Button>
           </form>
