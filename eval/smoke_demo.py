@@ -8,8 +8,9 @@ import tempfile
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8")
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if callable(_reconfigure):
+        _reconfigure(encoding="utf-8")
 
 
 def _headers(token: str) -> dict[str, str]:

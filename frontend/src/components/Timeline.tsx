@@ -70,7 +70,7 @@ function toMilestones(events: TimelineEvent[]): Milestone[] {
           const parsed = JSON.parse(ev.content ?? "")
           const parts: string[] = []
           if (parsed.after?.severity && parsed.after.severity !== parsed.before?.severity)
-            parts.push(`Severità → ${parsed.after.severity}`)
+            parts.push(`Severità: ${parsed.before?.severity ?? "—"} → ${parsed.after.severity}`)
           if (parsed.after?.add_teams?.length) parts.push(`+${parsed.after.add_teams.join(", ")}`)
           if (parsed.after?.remove_teams?.length) parts.push(`-${parsed.after.remove_teams.join(", ")}`)
           if (parsed.reason) parts.push(`motivo: ${parsed.reason}`)

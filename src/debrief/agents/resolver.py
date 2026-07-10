@@ -51,11 +51,14 @@ If your searches return nothing useful AND you cannot propose a confident soluti
 5. Keep responses focused on remediation. No lengthy analysis of what happened (that's the Investigator's job)."""
 
 
-def create_resolver_agent() -> Agent:
+def create_resolver_agent(temperature: float | None = None) -> Agent:
     """Crea e restituisce il resolver agent configurato."""
     return Agent(
         name="Resolver Agent",
-        model=Groq(id=MODELS["resolver"], temperature=TEMPERATURE["resolver"]),
+        model=Groq(
+            id=MODELS["resolver"],
+            temperature=TEMPERATURE["resolver"] if temperature is None else temperature,
+        ),
         description="Propone passi di risoluzione per gli incidenti basandosi su knowledge base e incidenti passati.",
         instructions=RESOLVER_INSTRUCTIONS,
         tools=[search_past_incidents, search_knowledge_base],

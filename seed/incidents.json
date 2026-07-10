@@ -68,5 +68,123 @@
     "resolution": "La finestra è stata recuperata tramite Task Manager: è stato prima minimizzato Embyon e successivamente è stata massimizzata la finestra del prelievo. La visualizzazione è così tornata corretta per l'utente.",
     "created_at": "2026-06-30T13:00:00",
     "resolved_at": "2026-06-30T14:00:00"
+  },
+  {
+    "id": "INC-008",
+    "title": "Outlook e Teams continuano a richiedere le credenziali dopo il cambio password",
+    "description": "Dopo il cambio della password aziendale, una dipendente riesce ad accedere a Windows ma Outlook e Teams mostrano ripetutamente la finestra di autenticazione. L'accesso dal browser funziona e gli altri utenti non hanno problemi. La rimozione e il reinserimento della password nelle singole applicazioni non risolvono.",
+    "severity": "SEV3",
+    "status": "resolved",
+    "resolution": "Nel Gestore credenziali di Windows erano rimaste credenziali Microsoft 365 associate alla password precedente. Sono state rimosse le voci obsolete relative a Office e Azure AD, quindi il PC è stato riavviato. Al successivo avvio l'utente ha effettuato nuovamente l'accesso e la sincronizzazione di Outlook e Teams è stata verificata con esito positivo.",
+    "created_at": "2026-01-19T08:40:00",
+    "resolved_at": "2026-01-19T09:35:00"
+  },
+  {
+    "id": "INC-009",
+    "title": "Sessione TSPlus bloccata su schermata nera per un singolo utente",
+    "description": "Un utente apre TSPlus ma, dopo l'autenticazione, visualizza soltanto una schermata nera. Lo stesso account presenta il problema sia dal client HTML5 sia da RemoteApp, mentre altri colleghi lavorano normalmente sul server. Chiudere il browser e riavviare il PC locale non cambia il comportamento.",
+    "severity": "SEV3",
+    "status": "resolved",
+    "resolution": "Sul server era rimasta attiva una sessione disconnessa dell'utente con il processo Explorer non responsivo. La sessione è stata terminata dalla console amministrativa TSPlus. L'utente ha eseguito un nuovo accesso e il desktop remoto e gli applicativi sono tornati visibili e utilizzabili.",
+    "created_at": "2026-02-03T11:10:00",
+    "resolved_at": "2026-02-03T11:45:00"
+  },
+  {
+    "id": "INC-010",
+    "title": "Terminale di pesatura acceso ma irraggiungibile dopo la sostituzione",
+    "description": "Il terminale della bilancia in area insacco è acceso e il cavo di rete mostra link, ma il gestionale non riceve più i pesi. Il dispositivo non risponde al ping neppure da una postazione della stessa rete. L'anomalia è iniziata subito dopo la sostituzione del terminale guasto con un'unità di scorta.",
+    "severity": "SEV2",
+    "status": "resolved",
+    "resolution": "L'unità di scorta conservava un indirizzo IP appartenente alla rete di collaudo e quindi non poteva comunicare con la VLAN di produzione. Il fornitore ha configurato indirizzo IP, gateway e subnet corretti. Dopo il riavvio sono stati verificati sia il ping sia l'invio di una pesata di prova al gestionale.",
+    "created_at": "2026-03-12T07:20:00",
+    "resolved_at": "2026-03-12T09:05:00"
+  },
+  {
+    "id": "INC-011",
+    "title": "Accesso a srv-file1 molto lento per tutti gli utenti dell'ufficio tecnico",
+    "description": "L'apertura delle cartelle condivise su srv-file1 richiede diversi minuti per gli utenti dell'ufficio tecnico. La navigazione delle cartelle locali è normale e non risultano problemi da TSPlus. Il server risponde al ping senza perdita di pacchetti, ma il rallentamento interessa più PC collegati allo stesso switch di piano.",
+    "severity": "SEV3",
+    "status": "resolved",
+    "resolution": "Una porta uplink dello switch negoziava a 100 Mbps invece di 1 Gbps a causa di una terminazione difettosa del cavo. 2000net ha rifatto la terminazione e la porta ha negoziato correttamente. L'apertura dei file condivisi è stata provata da due postazioni ed è tornata nei tempi normali.",
+    "created_at": "2026-04-08T14:15:00",
+    "resolved_at": "2026-04-08T17:10:00"
+  },
+  {
+    "id": "INC-012",
+    "title": "Cartella condivisa di srv-file1 non accessibile da una sola postazione",
+    "description": "Una dipendente riceve il messaggio 'Percorso di rete non trovato' aprendo la cartella amministrazione su srv-file1. I colleghi accedono regolarmente alla stessa condivisione e dal PC interessato Internet e le altre risorse aziendali funzionano. Il percorso era stato salvato come unità di rete.",
+    "severity": "SEV4",
+    "status": "resolved",
+    "resolution": "L'unità di rete memorizzava un vecchio percorso basato sul nome breve del server, non più risolto dalla postazione. È stata rimossa e ricreata usando il percorso UNC corretto. La cartella è stata riaperta e sono state verificate lettura e scrittura di un file di prova.",
+    "created_at": "2026-04-22T09:25:00",
+    "resolved_at": "2026-04-22T10:00:00"
+  },
+  {
+    "id": "INC-013",
+    "title": "FortiClient rifiuta la connessione VPN per certificato scaduto",
+    "description": "Un dipendente in smart working non riesce ad avviare la VPN. FortiClient interrompe la connessione durante la validazione e segnala che il certificato del gateway non è valido perché scaduto. Il problema è riprodotto anche da una seconda postazione esterna.",
+    "severity": "SEV2",
+    "status": "resolved",
+    "resolution": "2000net ha verificato la scadenza del certificato pubblicato sul FortiGate, lo ha rinnovato e associato nuovamente al portale SSL-VPN. Dopo il riavvio del servizio, due utenti hanno completato la connessione e raggiunto le risorse interne.",
+    "created_at": "2026-02-16T08:05:00",
+    "resolved_at": "2026-02-16T10:20:00"
+  },
+  {
+    "id": "INC-014",
+    "title": "FortiClient resta fermo al 40 percento durante la connessione",
+    "description": "Da una nuova connessione domestica FortiClient accetta le credenziali ma resta fermo al 40 percento e poi mostra un timeout. Lo stesso utente riesce a collegarsi usando l'hotspot del telefono, mentre altri dipendenti accedono normalmente alla VPN aziendale.",
+    "severity": "SEV3",
+    "status": "resolved",
+    "resolution": "Il router domestico bloccava il traffico necessario alla VPN tramite una funzione di protezione avanzata. Disabilitata temporaneamente la funzione e aggiornato il firmware del router, FortiClient ha completato la connessione. È stato confermato che il gateway aziendale non presentava anomalie.",
+    "created_at": "2026-03-05T16:10:00",
+    "resolved_at": "2026-03-05T17:30:00"
+  },
+  {
+    "id": "INC-015",
+    "title": "VPN connessa ma cartelle e server interni non raggiungibili",
+    "description": "FortiClient indica che la VPN è connessa e assegna un indirizzo al portatile, ma l'utente non riesce ad aprire srv-file1 né a raggiungere gli applicativi interni. Internet continua a funzionare. Il problema compare soltanto quando il dipendente si collega dalla rete Wi-Fi di un albergo.",
+    "severity": "SEV3",
+    "status": "resolved",
+    "resolution": "La rete dell'albergo usava la stessa sottorete IP di una rete interna aziendale, creando un conflitto di instradamento. Come workaround l'utente si è collegato tramite hotspot mobile e ha raggiunto tutte le risorse. È stato confermato che non erano necessarie modifiche al FortiGate.",
+    "created_at": "2026-05-07T18:30:00",
+    "resolved_at": "2026-05-07T19:05:00"
+  },
+  {
+    "id": "INC-016",
+    "title": "Genius Logistics non sincronizza gli ordini sui tablet del magazzino",
+    "description": "Da questa mattina i tablet del magazzino aprono Genius Logistics ma gli ordini restano in caricamento e non vengono aggiornati. La rete Wi-Fi risulta disponibile e la navigazione web funziona. Il problema interessa tutti i tablet, mentre Genius dalle postazioni cablate è operativo.",
+    "severity": "SEV2",
+    "status": "active",
+    "created_at": "2026-07-10T07:45:00"
+  },
+  {
+    "id": "INC-017",
+    "title": "Backup Veeam notturno di srv-db terminato con errore",
+    "description": "Il controllo mattutino mostra che il job Veeam di srv-db è terminato con errore durante la notte. Gli applicativi Genius sono attualmente disponibili e non risultano perdite di dati, ma non è presente un backup valido dell'ultima esecuzione. È in corso la verifica dello spazio sul repository.",
+    "severity": "SEV2",
+    "status": "active",
+    "created_at": "2026-07-10T08:10:00"
+  },
+  {
+    "id": "INC-018",
+    "title": "Stampante etichette della spedizione stampa codici a barre illeggibili",
+    "description": "La stampante termica dell'area spedizioni produce etichette con righe verticali e codici a barre che il lettore non riconosce. Il reparto sta usando temporaneamente una seconda stampante, con rallentamenti nella preparazione dei bancali. La pulizia esterna non ha risolto.",
+    "severity": "SEV3",
+    "status": "active",
+    "created_at": "2026-07-10T09:20:00"
+  },
+  {
+    "id": "INC-019",
+    "title": "Postazione laboratorio si riavvia durante l'analisi",
+    "description": "Il laboratorio segnala che il PC collegato allo strumento si è riavviato due volte mentre era in corso un'analisi. Non è ancora chiaro se compaia un errore, se i risultati siano stati salvati o se il problema riguardi anche altre postazioni.",
+    "status": "open",
+    "created_at": "2026-07-10T10:05:00"
+  },
+  {
+    "id": "INC-020",
+    "title": "Segnalata lentezza generica negli uffici amministrativi",
+    "description": "Un utente riferisce che 'da stamattina è tutto lento'. Non sono ancora stati indicati il programma interessato, il numero di persone coinvolte o eventuali messaggi di errore.",
+    "status": "open",
+    "created_at": "2026-07-10T10:40:00"
   }
 ]

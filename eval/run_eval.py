@@ -6,7 +6,7 @@ Esegue suite di test per le capacita' chiave del sistema:
   1. triage    - accuratezza di severita' del Triage Agent
   2. routing   - correttezza dell'Orchestrator (router LLM) nello smistare i messaggi
   3. resolver  - groundedness e provenance delle remediation
-  4. retrieval - qualita' del RAG (precision/recall/MRR sui cluster di ground truth)
+  4. retrieval - qualita' del RAG (precision/recall/MRR sugli incidenti attesi)
 5. learning  - loop di apprendimento da soluzione umana
   6. injection - robustezza alla prompt injection (red-team, metrica di sicurezza)
 
@@ -35,8 +35,9 @@ import time
 # reconfigure() esiste dai TextIOWrapper di Python 3.7+; il guard evita errori
 # in contesti dove lo stream non lo supporta.
 for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8")
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if callable(_reconfigure):
+        _reconfigure(encoding="utf-8")
 
 # Aggiunge src/ al path di import, come seed/run_seed.py: così `import debrief...`
 # funziona anche lanciando questo file direttamente
@@ -63,9 +64,21 @@ def _load_json(path: str) -> dict | list:
         return json.load(f)
 
 
+def _load_json_records(path: str) -> list[dict]:
+    """Carica un array JSON composto esclusivamente da oggetti."""
+    data = _load_json(path)
+    if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+        raise ValueError(f"Formato non valido in {path}: atteso un array di oggetti JSON")
+    return data
+
+
 def _suite_data(name: str) -> dict:
     """Carica i casi di una suite mantenendo il runner leggero."""
-    data = _load_json(CASES_PATH)[name]
+    suites = _load_json(CASES_PATH)
+    if not isinstance(suites, dict):
+        raise ValueError(f"Formato non valido in {CASES_PATH}: atteso un oggetto JSON")
+
+    data = suites[name]
     selected = LIGHT_CASE_IDS.get(name)
     if not selected:
         return data
@@ -110,7 +123,7 @@ def eval_triage() -> dict:
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
 
     data = _suite_data("triage")
-    teams = _load_json(os.path.join(SEED_DIR, "teams.json"))
+    teams = _load_json_records(os.path.join(SEED_DIR, "teams.json"))
     valid_team_ids = {t["id"] for t in teams}
 
     # Un solo agente riusato per tutti i casi: il catalogo team e' fisso.
@@ -240,10 +253,9 @@ def eval_resolver() -> dict:
 
     _require_vector_tables()
     data = _suite_data("resolver")
-    incidents = _load_json(os.path.join(SEED_DIR, "incidents.json"))
+    incidents = _load_json_records(os.path.join(SEED_DIR, "incidents.json"))
     valid_ids = {item["id"] for item in incidents}
-    agent = create_resolver_agent()
-    agent.model.temperature = 0
+    agent = create_resolver_agent(temperature=0)
 
     total = grounded = expected_hit = cited_any = execution_failures = 0
     print("\n== Suite: Resolver (groundedness e provenance) ==\n")
@@ -275,7 +287,7 @@ def eval_resolver() -> dict:
 
 # Suite 4: RETRIEVAL
 def eval_retrieval() -> dict:
-    """Valuta il RAG sugli incidenti passati usando i cluster come ground truth.
+    """Valuta il RAG confrontando i risultati con gli incidenti attesi.
 
     Per ogni query calcola precision@k, recall@k, MRR e hit@1, poi fa la media.
     Non usa LLM: solo embedding locali + LanceDB, quindi gira anche senza GROQ_API_KEY.
@@ -320,9 +332,9 @@ def eval_retrieval() -> dict:
             f"P@{k}={precision:.2f} R@{k}={recall:.2f} MRR={rr:.2f} "
             f"| recuperati={retrieved}"
         )
-        # Consideriamo "ok" la riga se ha trovato almeno meta' del cluster.
+        # Consideriamo "ok" la riga se ha trovato almeno meta' degli incidenti attesi.
         mark = "PASS" if recall >= 0.5 else "FAIL"
-        print(f"   [{mark}] {case['id']} [{case['cluster']}] - {detail}")
+        print(f"   [{mark}] {case['id']} - {detail}")
 
     metrics = {
         "precision_at_k": _pct(sum_prec, n),
@@ -397,7 +409,7 @@ def eval_injection() -> dict:
     from debrief.agents.orchestrator import create_router_agent, route_message
 
     data = _suite_data("injection")
-    teams = _load_json(os.path.join(SEED_DIR, "teams.json"))
+    teams = _load_json_records(os.path.join(SEED_DIR, "teams.json"))
     valid_team_ids = {t["id"] for t in teams}
 
     triage_agent = create_triage_agent(teams)

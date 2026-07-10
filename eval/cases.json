@@ -21,18 +21,12 @@
       },
       {
         "id": "TRI-04",
-        "description": "Il timbratore del trituratore è alimentato e la porta switch ha link attivo, ma il dispositivo non risponde in rete e mancano timbrature nel gestionale.",
-        "expected_severity": "SEV3",
-        "expected_needs_clarification": false
-      },
-      {
-        "id": "TRI-05",
         "description": "In TSPlus una finestra modale di Embyon resta fuori dall'area visibile per un solo utente, bloccando l'operazione ma lasciando disponibili gli altri applicativi.",
         "expected_severity": "SEV3",
         "expected_needs_clarification": false
       },
       {
-        "id": "TRI-06",
+        "id": "TRI-05",
         "description": "Non funziona niente, aiuto.",
         "expected_severity": null,
         "expected_needs_clarification": true
@@ -112,21 +106,28 @@
     "cases": [
       {
         "id": "RET-01",
-        "cluster": "m365_authentication",
         "query": "Un dipendente non accede a Microsoft 365 per un blocco nella verifica dell'account.",
-        "relevant_ids": ["INC-001", "INC-004"]
+        "relevant_ids": ["INC-001", "INC-004", "INC-008"]
       },
       {
         "id": "RET-02",
-        "cluster": "tsplus_remote_session",
         "query": "Un'applicazione pubblicata tramite TSPlus non si apre correttamente nella sessione remota.",
-        "relevant_ids": ["INC-003", "INC-007"]
+        "relevant_ids": ["INC-003", "INC-007", "INC-009"]
       },
       {
         "id": "RET-03",
-        "cluster": "unreachable_network_device",
         "query": "Un dispositivo di stabilimento è acceso ma non raggiungibile in rete e causa un disservizio.",
-        "relevant_ids": ["INC-005", "INC-006"]
+        "relevant_ids": ["INC-005", "INC-006", "INC-010"]
+      },
+      {
+        "id": "RET-04",
+        "query": "Da alcune postazioni aprire documenti e cartelle condivise sul file server non funziona oppure richiede troppo tempo.",
+        "relevant_ids": ["INC-002", "INC-011", "INC-012"]
+      },
+      {
+        "id": "RET-05",
+        "query": "Un collega fuori sede non riesce a usare correttamente la VPN o a raggiungere la rete aziendale dopo essersi collegato.",
+        "relevant_ids": ["INC-013", "INC-014", "INC-015"]
       }
     ]
   },

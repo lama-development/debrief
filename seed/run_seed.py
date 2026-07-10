@@ -21,8 +21,9 @@ import json
 import glob     # cerca file con un pattern (es. tutti i *.md in una cartella)
 
 for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8")
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if callable(_reconfigure):
+        _reconfigure(encoding="utf-8")
 
 # Aggiungi la cartella src/ al path di Python così possiamo importare `debrief`.
 # __file__ = percorso di questo script; dirname(__file__) = la sua cartella (seed/);
