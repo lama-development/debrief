@@ -256,7 +256,7 @@ export function IncidentDetailPage() {
                   {incident.participants.map((participant) => (
                     <span
                       key={participant.id}
-                      className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                      className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium"
                     >
                       {participant.username}
                     </span>
@@ -277,7 +277,7 @@ export function IncidentDetailPage() {
                     return (
                       <span
                         key={teamId}
-                        className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium"
                       >
                         {label}
                         {!isResolved && (
