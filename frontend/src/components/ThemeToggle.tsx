@@ -3,10 +3,7 @@ import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-// Pulsante che alterna tema chiaro/scuro. Aggiunge/rimuove la classe .dark su
-// <html> (che attiva il blocco .dark di index.css) e ricorda la scelta in
-// localStorage. Lo stato iniziale lo legge dalla classe già impostata dallo
-// script anti-flicker in index.html.
+// Mantiene classe HTML e preferenza salvata sincronizzate.
 export function ThemeToggle() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
 

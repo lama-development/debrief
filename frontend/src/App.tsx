@@ -25,7 +25,6 @@ function App() {
           </RequireAuth>
         }
       />
-      {/* Qualsiasi altra rotta torna alla dashboard. */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ButtonProps } from "@/components/ui/button";
 
-// Dialog di chiusura incidente: richiede soltanto il riepilogo della risoluzione.
 export function ResolveDialog({
   incidentId,
   triggerSize,

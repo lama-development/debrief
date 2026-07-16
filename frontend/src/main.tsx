@@ -7,11 +7,10 @@ import { AuthProvider } from "@/auth/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import "./index.css";
 
-// Un'unica istanza del QueryClient per tutta l'app (cache condivisa).
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Evita refetch aggressivi: i dati restano "freschi" 30s; niente refetch al focus.
+      // Limita i refetch automatici.
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       retry: 1,
@@ -19,9 +18,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Nota: niente <StrictMode> di proposito. In dev raddoppia l'esecuzione degli
-// effect, e qui ChatPanel ha un effect che AVVIA il triage automatico al mount:
-// con StrictMode partirebbe due volte.
+// StrictMode duplicava il triage automatico in sviluppo.
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>

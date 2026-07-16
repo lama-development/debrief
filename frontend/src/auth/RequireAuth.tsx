@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "@/auth/AuthContext";
 
-// Guardia di route: mostra i figli solo se l'utente è autenticato, altrimenti
-// reindirizza a /login (ricordando la destinazione per il redirect post-login).
+// Conserva la destinazione per il redirect dopo il login.
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();

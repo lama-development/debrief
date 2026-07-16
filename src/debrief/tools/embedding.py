@@ -2,7 +2,7 @@
 
 import os
 
-# Evita progress bar rumorose negli script CLI (`uv run seed`, `uv run eval`).
+# Evita barre di avanzamento rumorose negli script CLI.
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 
 import logging
@@ -12,7 +12,7 @@ from debrief.config import EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
-# Lazy singleton: il caricamento del modello è costoso.
+# Il modello viene caricato solo al primo utilizzo e poi riusato.
 _model = None
 
 
@@ -36,7 +36,7 @@ def embed_text(text: str) -> list[float]:
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Calcola gli embedding in batch."""
+    """Calcola più embedding in un'unica operazione."""
     model = get_model()
     vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
     return vectors.tolist()

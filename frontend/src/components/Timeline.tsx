@@ -25,7 +25,7 @@ function actorCls(actor: string | null) {
   return BOT_ACTORS.has(actor ?? "") ? AGENT_IDENTITY.debrief.timelineCls : HUMAN_CLS;
 }
 
-// Un milestone è un FATTO saliente del ciclo di vita (non un messaggio di chat).
+// `Milestone` rappresenta un evento di ciclo di vita, esclusa la chat.
 interface Milestone {
   key: string;
   time: string;
@@ -35,13 +35,10 @@ interface Milestone {
   cls: string;
 }
 
-// Traduce gli eventi grezzi di timeline nei soli milestone, scartando la
-// conversazione (message + prosa degli agenti). La chat mostra il dialogo;
-// qui resta la cronologia "ufficiale" dei fatti con data e ora.
+// Estrae la cronologia ufficiale dagli eventi grezzi.
 function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => string): Milestone[] {
   const out: Milestone[] = [];
-  // Gli involvement del triage precedono il relativo evento "triage" nel DB.
-  // Li accumuliamo per singolo passaggio e li azzeriamo dopo ogni classificazione.
+  // Accumula i team fino al relativo evento di triage.
   const pendingTriageTeams = new Set<string>();
 
   events.forEach((ev, idx) => {
@@ -74,8 +71,7 @@ function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => str
         });
         pendingTriageTeams.clear();
         break;
-      // involvement e disinvolvement individuali: il triage li aggrega sopra,
-      // quelli umani sono già riassunti nell'evento "override".
+      // Coinvolgimenti già aggregati dagli eventi di triage e `override`.
       case "disinvolvement":
         break;
       case "override": {
@@ -127,7 +123,7 @@ function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => str
         });
         break;
       case "resolution":
-        // Distinzione via attore: l'agente PROPONE, una persona CHIUDE l'incidente.
+        // Il Resolver propone; una persona chiude.
         if (ev.actor === "resolver") {
           out.push({
             key: `${ev.id}`,
@@ -146,7 +142,7 @@ function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => str
           });
         }
         break;
-      // "message" e ogni altro evento conversazionale: ignorati (sono nella chat).
+      // Gli eventi conversazionali restano nella chat.
     }
   });
   return out;

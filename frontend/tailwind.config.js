@@ -1,8 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Config Tailwind v3 (stile shadcn/ui). I colori sono variabili CSS definite in
-// src/index.css (light in :root, dark in .dark) e qui mappati sulle classi
-// (bg-primary, text-muted-foreground, ...). darkMode:"class" attiva il tema
-// scuro tramite la classe .dark su <html> (gestita dal ThemeToggle).
+// Mappa le variabili tema di index.css sulle utility Tailwind.
 export default {
   darkMode: ["class"],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],

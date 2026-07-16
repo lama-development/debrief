@@ -6,7 +6,7 @@ import type { User } from "@/lib/types";
 
 interface AuthContextValue {
   user: User | null;
-  loading: boolean; // true mentre validiamo un token salvato all'avvio
+  loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string, teamId: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -19,8 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(() => Boolean(getAuthToken()));
 
-  // All'avvio: se c'è un token salvato, proviamo a recuperare l'utente (/auth/me).
-  // Registriamo anche l'handler di 401 che pulisce lo stato di sessione.
+  // Ripristina la sessione e registra il reset globale sui 401.
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setAuthToken(null);
@@ -34,7 +33,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .me()
         .then(setUser)
         .catch(() => {
-          // token non più valido: lo rimuoviamo silenziosamente.
           setAuthToken(null);
           setUser(null);
         })
@@ -62,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } catch {
-      // best-effort: anche se la chiamata fallisce, puliamo comunque lato client.
+      // Il logout locale deve riuscire comunque.
     }
     setAuthToken(null);
     setUser(null);

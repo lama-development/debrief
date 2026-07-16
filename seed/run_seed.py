@@ -1,28 +1,10 @@
-"""
-run_seed.py - Aggiorna SQLite e rigenera LanceDB con i dati di seed.
-
-Uso:
-    uv run seed
-
-Cosa fa:
-1. Crea le tabelle SQLite mancanti
-2. Inserisce o sostituisce team e incidenti seed in SQLite
-3. Calcola gli embedding localmente
-4. Indicizza incidenti passati e knowledge base in LanceDB
-5. Esegue un test di ricerca semantica per verificare che funzioni
-
-È uno SCRIPT, non un modulo importato dall'app. È ripetibile sui dati demo, ma
-non azzera utenti, sessioni o incidenti runtime non collidenti: non va usato come
-migrazione o reset di un ambiente con dati importanti.
-"""
+"""Rigenera SQLite e LanceDB dai dati dimostrativi; non è una migrazione."""
 
 import os
-import sys      # accesso agli stream stdout/stderr
+import sys
 import json
-import glob     # cerca file con un pattern (es. tutti i *.md in una cartella)
+import glob
 
-# Riusiamo le STESSE funzioni dell'app (DRY): seed e runtime scrivono in modo
-# identico, così i dati di seed e quelli creati a runtime hanno la stessa forma.
 from debrief.database import get_connection, create_tables, load_teams, load_incidents
 from debrief.tools.embedding import embed_text, embed_texts
 from debrief.rag.indexer import (
@@ -44,21 +26,18 @@ def main():
     print(" Debrief - Database seed")
     print("================================================")
 
-    # Percorsi (relativi alla root del progetto). os.path.join unisce i pezzi con
-    # il separatore giusto del sistema operativo (\ su Windows, / su Linux/Mac).
     seed_dir = os.path.join(os.path.dirname(__file__))
     incidents_path = os.path.join(seed_dir, "incidents.json")
     teams_path = os.path.join(seed_dir, "teams.json")
     kb_dir = os.path.join(seed_dir, "knowledge_base")
 
-    # --- 1. SQLite ---
+    # SQLite
     print("\n== SQLite ==")
     print("[INFO] Preparing database")
     conn = get_connection()
-    create_tables(conn)              # idempotente: sicuro anche se le tabelle esistono già
+    create_tables(conn)
     print("[OK] Tables created")
 
-    # Ogni loader restituisce QUANTI record ha caricato: lo stampiamo come riscontro.
     n_teams = load_teams(conn, teams_path)
     print(f"[OK] {n_teams} teams loaded")
 
@@ -67,30 +46,21 @@ def main():
 
     conn.close()
 
-    # --- 2. Carica i dati per l'indicizzazione ---
-    # Per il RAG ci servono i dati grezzi (gli stessi file JSON), che rileggiamo qui
-    # perché ora dobbiamo calcolarne gli embedding, non solo salvarli in SQLite.
+    # Dati per l'indicizzazione
     print("\n== LanceDB source data ==")
     print("[INFO] Preparing documents")
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
 
-    # Nel RAG (past_incidents) finiscono SOLO gli incidenti risolti: sono gli unici
-    # con una resolution, cioè con qualcosa di utile da recuperare.
-    # Gli incidenti open/active sono "in corso" e non hanno una risoluzione da indicizzare.
+    # Solo i casi risolti contengono conoscenza riutilizzabile.
     rag_incidents = [inc for inc in incidents if inc.get("status", "resolved") == "resolved"]
 
-    # Carica i runbook della knowledge base (file Markdown).
     kb_docs = []
-    # glob("*.md") trova tutti i file .md; sorted() li ordina per nome (output stabile).
     for filepath in sorted(glob.glob(os.path.join(kb_dir, "*.md"))):
         with open(filepath, encoding="utf-8") as f:
-            text = f.read()          # legge l'INTERO contenuto del file come stringa
-        filename = os.path.basename(filepath)   # solo il nome file, senza il percorso
+            text = f.read()
+        filename = os.path.basename(filepath)
         kb_docs.append({
-            # Dal nome file ricaviamo id e titolo: togliamo ".md" per l'id; per il
-            # titolo sostituiamo "_" con spazi e .title() mette le iniziali maiuscole
-            # (es. "vpn_forticlient.md" -> "Vpn Forticlient").
             "id": filename.replace(".md", ""),
             "title": filename.replace("_", " ").replace(".md", "").title(),
             "text": text,
@@ -102,74 +72,59 @@ def main():
         f"{len(kb_docs)} runbooks ready"
     )
 
-    # Risolvi i placeholder {{TEAM_ID}} nei runbook con i nomi reali dal catalogo team.
-    # Il testo indicizzato in LanceDB sarà leggibile e autocontenuto,
-    # ma nel sorgente markdown cambi il nome in un posto solo (teams.json).
+    # Rende le procedure indicizzate autonome dai segnaposto dei team.
     with open(teams_path, encoding="utf-8") as f:
         teams = json.load(f)
-    # Dict comprehension: costruisce una mappa {id_team: nome_team} per la sostituzione.
     team_map = {team["id"]: team["name"] for team in teams}
 
-    placeholders_resolved = 0   # contatore, solo per il messaggio di riepilogo finale
+    placeholders_resolved = 0
     for doc in kb_docs:
-        # .items() itera la mappa dando coppie (chiave, valore) = (id, nome).
         for team_id, team_name in team_map.items():
-            placeholder = "{{" + team_id + "}}"   # es. "{{T-NET}}"
+            placeholder = "{{" + team_id + "}}"
             if placeholder in doc["text"]:
-                count = doc["text"].count(placeholder)        # quante occorrenze
-                doc["text"] = doc["text"].replace(placeholder, team_name)  # sostituisci tutte
+                count = doc["text"].count(placeholder)
+                doc["text"] = doc["text"].replace(placeholder, team_name)
                 placeholders_resolved += count
 
     print(f"[OK] {placeholders_resolved} team placeholders resolved in runbooks")
 
-    # --- 3. Calcola gli embedding ---
+    # Embedding
     print("\n== Embeddings ==")
 
-    # Per ogni tipo costruiamo la lista dei testi DA incorporare. Devono coincidere
-    # con il testo usato in fase di ricerca (vedi indexer._build_incident_text).
     incident_texts = [_build_incident_text(inc) for inc in rag_incidents]
     kb_texts = [doc["text"] for doc in kb_docs]
     print(f"[INFO] Computing {len(incident_texts) + len(kb_texts)} embeddings")
 
-    # Calcola TUTTI gli embedding in un'unica chiamata batch: molto più veloce che
-    # farne una per testo. `+` tra liste le concatena in un'unica grande lista.
+    # Un'unica elaborazione in blocco riduce il costo di inferenza.
     all_texts = incident_texts + kb_texts
     all_vectors = embed_texts(all_texts)
 
-    # Ora dividiamo il grande blocco di vettori nei due gruppi, nello stesso ordine
-    # in cui li abbiamo concatenati. Usiamo lo slicing [inizio:fine] e un indice
-    # scorrevole `idx`.
+    # Mantiene lo stesso ordine usato nel batch.
     idx = 0
     incident_vectors = all_vectors[idx:idx + len(rag_incidents)]
     idx += len(rag_incidents)
     kb_vectors = all_vectors[idx:idx + len(kb_docs)]
 
-    # --- 4. Indicizza in LanceDB ---
+    # Indicizzazione
     print("\n== Indexing ==")
     print("[INFO] Writing LanceDB tables")
     db = get_db()
 
-    # Ogni funzione index_* crea/sovrascrive la sua collezione e restituisce il
-    # numero di record indicizzati.
     n = index_incidents(db, rag_incidents, incident_vectors)
     print(f"[OK] {n} incidents indexed in 'past_incidents'")
 
     n = index_knowledge_base(db, kb_docs, kb_vectors)
     print(f"[OK] {n} runbooks indexed in 'knowledge_base'")
 
-    # --- 5. Test di ricerca ---
-    # Verifica di sanità: cerchiamo qualche query di esempio e stampiamo i risultati,
-    # così vediamo subito se la ricerca semantica funziona dopo il seed.
+    # Verifica rapida del recupero semantico
     print("\n== Semantic search smoke test ==")
 
-    # Lista di tuple (query, tabella_in_cui_cercare).
     test_queries = [
         ("TSPlus Remote App disconnette subito dopo il login", "past_incidents"),
         ("timbratore alimentato ma non raggiungibile sulla VLAN corretta", "past_incidents"),
         ("come gestire un errore del PLC", "knowledge_base"),
     ]
 
-    # "for query, table in lista" spacchetta ogni tupla nelle due variabili.
     for query, table in test_queries:
         query_vec = embed_text(query)
         results = search(db, table, query_vec, k=3, threshold=0.3)
@@ -177,9 +132,8 @@ def main():
         print(f"[QUERY] \"{query}\" [{table}]")
         if results:
             for r in results:
-                similarity = 1 - r["_distance"] / 2  # distanza L2 -> coseno
+                similarity = 1 - r["_distance"] / 2  # Da distanza L2 a similarità coseno
                 id_field = r.get("id", "?")
-                # Prova "title"; se manca usa i primi 60 char di "text".
                 title_field = r.get("title", r.get("text", "")[:60])
                 print(f"   [HIT] {id_field} score={similarity:.2f} {title_field}")
         else:
@@ -189,6 +143,5 @@ def main():
     print("[DONE] Seed complete. The database is ready.")
 
 
-# Esegui main() solo se lo script è lanciato direttamente (non se importato).
 if __name__ == "__main__":
     main()

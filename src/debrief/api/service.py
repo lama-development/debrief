@@ -1,25 +1,10 @@
-"""
-service.py - Livello di servizio tra le route HTTP e il resto del sistema.
-
-È l'UNICO posto che conosce:
-- la macchina a stati dell'incidente (transizioni consentite);
-- la sequenza di persistenza di ogni turno di chat;
-- il loop di apprendimento (re-indicizzazione in LanceDB alla risoluzione).
-
-Le route restano sottili: parse della richiesta -> chiamata al servizio -> risposta.
-La chat è uno *streaming*: `stream_chat` è un generatore sincrono che produce eventi
-(dict). FastAPI esegue i generatori sincroni in un threadpool, quindi le chiamate
-bloccanti (sqlite, sentence-transformers, LanceDB) non bloccano l'event loop e non
-serve un refactor async.
-"""
+"""Orchestrazione di chat, ciclo di vita e persistenza degli incidenti."""
 
 import json
 import logging
 import re
 from datetime import datetime, timezone
 
-# Tipi di evento che Agno emette durante lo streaming di un agente: contenuto
-# (token), completamento, inizio chiamata a un tool. Li riconosciamo con isinstance.
 from agno.run.agent import RunContentEvent, RunCompletedEvent, ToolCallCompletedEvent, ToolCallStartedEvent
 
 from debrief import database as db
@@ -43,56 +28,20 @@ DEBRIEF_HELP_TEXT = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Macchina a stati
-# ---------------------------------------------------------------------------
-# Le transizioni sono keyed per *evento semantico* e guardate da una tabella:
-# una transizione non prevista dallo stato corrente viene ignorata (lo stato
-# resta invariato). Così, ad es., un messaggio al resolver su un incidente già
-# 'resolved' non lo riapre.
-
-# Struttura: dizionario di dizionari. Per ogni evento, una mappa
-# {stato_di_partenza: stato_di_arrivo}. Se lo stato corrente non è tra le chiavi
-# interne, la transizione semplicemente non avviene (vedi advance_status).
-# evento -> {stato_di_partenza: stato_di_arrivo}
-# Ciclo di vita a 3 stati: open -> active -> resolved (riapribile).
-# ---------------------------------------------------------------------------
-# Helper SSE
-# ---------------------------------------------------------------------------
+# Supporto SSE
 
 def sse_frame(event: dict) -> str:
-    """Serializza un evento come frame SSE (`data: <json>\\n\\n`).
-    La route fa semplicemente: `(sse_frame(e) for e in stream_chat(...))`."""
-    # SSE (Server-Sent Events) è il protocollo con cui il server "spinge" eventi al
-    # browser su una singola connessione HTTP. Il formato richiede: la riga
-    # "data: <contenuto>" seguita da DUE a-capo (\n\n) che segnano la fine del frame.
+    """Serializza un evento SSE e lo termina con una riga vuota."""
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-# ---------------------------------------------------------------------------
-# Chat in streaming (il cuore)
-# ---------------------------------------------------------------------------
+# Chat con risposta progressiva
 
 def stream_chat(incident_id: str, message: str, user_id: str):
-    """Generatore sincrono che orchestra un turno di chat e produce eventi dict.
-
-    NOTA SUI GENERATORI (concetto Python chiave qui):
-    Una funzione che contiene `yield` non restituisce un valore unico: diventa un
-    GENERATORE. Ogni `yield X` "consegna" X al chiamante e METTE IN PAUSA la
-    funzione; alla richiesta successiva riparte da dove si era fermata. Così
-    possiamo produrre eventi UNO ALLA VOLTA man mano che arrivano, invece di
-    aspettare la fine. È ciò che permette alla chat di apparire "in tempo reale".
-
-    Sequenza: carica incidente -> persiste messaggio utente -> routing (bloccante)
-    -> agente (triage bloccante / investigator+resolver in streaming) -> persiste
-    la risposta -> applica la transizione di stato -> 'done'.
-
-    Schema eventi: routing | tool | token | triage | done | error.
-    """
+    """Orchestra un turno e produce eventi compatibili con SSE."""
     try:
         incident = db.get_incident(incident_id)
         if incident is None:
-            # yield "consegna" un evento di errore e poi `return` chiude il generatore.
             yield {"type": "error", "message": f"Incident {incident_id} not found"}
             return
 
@@ -102,25 +51,20 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         description = incident["description"]
         conversation_context = _conversation_context(incident_id)
 
-        # 1. Persisti il messaggio dell'utente in timeline.
         db.add_timeline_event(incident_id, "message", user_id, message)
 
-        # I messaggi della chat appartengono prima di tutto al team. Dopo il triage
-        # iniziale Debrief interviene solo quando viene menzionato esplicitamente.
-        # Finché l'incidente è "open", invece, ogni risposta completa il normale
-        # ciclo di chiarimenti del triage senza obbligare l'utente a ripetere la mention.
+        # Dopo il triage Debrief risponde solo se menzionato.
         bot_requested = status == "open" or DEBRIEF_MENTION_RE.search(message) is not None
         if not bot_requested:
             yield {"type": "done", "status": status, "incident_id": incident_id}
             return
 
-        # 2. Routing (bloccante, veloce: piccola decisione JSON). Emettiamo subito
-        #    un evento "routing" così la UI può mostrare "sto pensando con X".
+        # La decisione viene inviata subito, così la UI mostra l'agente attivo.
         router = create_router_agent()
         decision = route_message(router, message, status, description)
         yield {"type": "routing", "agent": decision.agent.value, "reason": decision.reason}
 
-        # 3-4. Esegui l'agente scelto.
+        # Tutti gli agenti vengono adattati allo stesso protocollo di eventi.
         if decision.agent == AgentRole.TRIAGE:
             event_name, _ = yield from _stream_triage(
                 incident_id, message, description, conversation_context
@@ -140,30 +84,28 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         elif decision.agent == AgentRole.OVERRIDE:
             yield from _stream_override(decision)
             event_name = None
-        else:  # Mention valida, ma nessun agente specialistico necessario.
+        else:
             yield {"type": "token", "content": DEBRIEF_HELP_TEXT}
             db.add_timeline_event(incident_id, "message", "debrief", DEBRIEF_HELP_TEXT)
             event_name = None
 
-        # 5. Applica l'eventuale transizione di stato (solo eventi automatici dalla chat).
+        # Solo un evento semantico valido può avanzare la macchina a stati.
         new_status = status
         if event_name:
             new_status = advance_status(status, event_name)
-            # Scriviamo nel DB solo se lo stato è davvero cambiato.
             if new_status != status:
                 db.set_incident_status(incident_id, new_status)
 
-        # 6. Evento finale: segnala alla UI che il turno è concluso e qual è il nuovo stato.
         yield {"type": "done", "status": new_status, "incident_id": incident_id}
 
     except Exception as e:
-        # Qualsiasi errore diventa un evento "error" invece di rompere lo stream.
+        # Gli errori restano nel protocollo del flusso.
         yield {"type": "error", "message": str(e)}
 
 
 def _stream_triage(incident_id: str, message: str, description: str = "",
                    conversation_context: str = ""):
-    """Triage: output strutturato. Restituisce tupla (event_name, triage_result)."""
+    """Esegue il triage e restituisce evento e risultato strutturato."""
     teams, valid_ids = db.get_teams()
     agent = create_triage_agent(teams)
     triage_input = message
@@ -205,7 +147,7 @@ def _stream_triage(incident_id: str, message: str, description: str = "",
 
 def _stream_investigator(incident_id: str, message: str, description: str,
                          triage_context: str = "", conversation_context: str = ""):
-    """Investigator: token streaming. Restituisce il testo completo per il resolver."""
+    """Trasmette l'indagine progressivamente e ne restituisce il testo completo."""
     agent = create_investigator_agent()
     incident_context = description
     if conversation_context:
@@ -213,13 +155,13 @@ def _stream_investigator(incident_id: str, message: str, description: str,
     prompt = build_investigation_prompt(message, incident_context, triage_context=triage_context)
     full, _ = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "message", "investigator", full)
-    return full  # passato al resolver nella pipeline automatica
+    return full
 
 
 def _stream_resolver(incident_id: str, message: str, description: str,
                      triage_context: str = "", investigation_summary: str = "",
                      conversation_context: str = ""):
-    """Resolver: token streaming. Garantisce lo stato 'active'."""
+    """Trasmette progressivamente i passi di risoluzione."""
     agent = create_resolver_agent()
     additional_parts = []
     if triage_context:
@@ -234,6 +176,7 @@ def _stream_resolver(incident_id: str, message: str, description: str,
     full, has_evidence = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "resolution", "resolver", full)
     if not has_evidence:
+        # Senza fonti RAG utili la proposta richiede una verifica umana.
         reason = "Nessuna fonte applicabile trovata: è richiesto il contributo di una persona esperta."
         db.add_timeline_event(incident_id, "escalation", "resolver", reason)
         yield {
@@ -244,8 +187,7 @@ def _stream_resolver(incident_id: str, message: str, description: str,
 
 
 def _stream_override(decision: RoutingDecision):
-    """Propone un override strutturato senza applicarlo: aspetta conferma dal frontend.
-    Valida team e severità rispetto al catalogo; emette override_proposed se valido."""
+    """Valida e propone una modifica manuale senza applicarla."""
     params = decision.override_params
     if params is None:
         yield {"type": "token", "content": "Non riesco a capire cosa vuoi modificare. Specifica severità (es. 'alza a SEV1') o team (es. 'coinvolgi PRODUCTION')."}
@@ -288,27 +230,21 @@ def _conversation_context(incident_id: str, limit: int = 12) -> str:
 
 
 def _stream_agent_prose(agent, prompt: str):
-    """Itera `agent.run(stream=True)` inoltrando i delta come eventi 'token'
-    (e i tool call come eventi 'tool', opzionali per la UX). Restituisce il testo
-    completo accumulato, da persistere in timeline."""
-    full = ""   # qui accumuliamo l'intera risposta pezzo per pezzo
+    """Inoltra token e chiamate agli strumenti, restituendo testo ed evidenza RAG."""
+    full = ""
     tool_calls = 0
     useful_tool_results = 0
     try:
-        # Con stream=True, agent.run NON restituisce un valore unico ma è ITERABILE:
-        # produce una sequenza di eventi via via che il modello genera. Il for li
-        # consuma uno a uno.
         for ev in agent.run(prompt, stream=True, stream_events=True):
             if isinstance(ev, ToolCallStartedEvent):
                 tool_calls += 1
-                # L'agente sta chiamando un tool di ricerca. getattr(obj, "attr",
-                # default) legge un attributo in modo sicuro (default se assente).
                 name = getattr(ev.tool, "tool_name", None) if ev.tool else None
                 if name:
-                    yield {"type": "tool", "name": name}   # la UI può mostrare lo stato di ricerca
+                    yield {"type": "tool", "name": name}
             elif isinstance(ev, ToolCallCompletedEvent):
                 tool_result = ev.tool.result if ev.tool else None
                 content = str(ev.content or tool_result or "").lower()
+                # Una chiamata vuota non è considerata evidenza per la risoluzione.
                 no_result_markers = (
                     "no similar past incidents found",
                     "no relevant knowledge base articles found",
@@ -316,39 +252,30 @@ def _stream_agent_prose(agent, prompt: str):
                 if content and not any(marker in content for marker in no_result_markers):
                     useful_tool_results += 1
             elif isinstance(ev, RunContentEvent):
-                # Un "delta" di testo (qualche parola). Lo accumuliamo e lo inoltriamo.
                 if ev.content:
                     full += ev.content
                     yield {"type": "token", "content": ev.content}
             elif isinstance(ev, RunCompletedEvent):
-                # Evento finale: contiene il testo completo "autorevole". Lo usiamo
-                # come versione definitiva (sovrascrive l'accumulo, per sicurezza).
+                # Il contenuto finale è la versione autorevole.
                 if ev.content:
                     full = ev.content
     except Exception as e:
-        # Se la generazione si interrompe, segnaliamo l'errore in linea senza perdere
-        # il testo già prodotto.
+        # Conserva anche il testo prodotto prima dell'errore.
         err = f"\n\n[errore durante la generazione: {e}]"
         full += err
         yield {"type": "token", "content": err}
-    # Il valore di `return` di un generatore viene raccolto da chi fa `yield from`.
     return full, tool_calls > 0 and useful_tool_results > 0
 
 
-# ---------------------------------------------------------------------------
-# Ciclo di vita dell'incidente (non-streaming)
-# ---------------------------------------------------------------------------
+# Ciclo di vita
 
 def create_incident(description: str, created_by: str) -> dict:
-    """Crea un incidente in stato 'open'. La classificazione (triage) NON avviene
-    qui: il client apre la chat con la descrizione come primo messaggio, e il
-    router (open -> triage) la classifica. Così tutto il lavoro degli agenti passa
-    da un unico percorso (stream_chat)."""
+    """Crea un incidente `open`; il triage avviene in chat."""
     return db.create_incident(description, created_by)
 
 
 def list_incidents(user_id: str, status: str | None = None, limit: int = 100) -> list[dict]:
-    """Elenca le conversazioni dell'utente e gli incidenti seed pubblici."""
+    """Elenca le conversazioni dell'utente e gli incidenti dimostrativi accessibili."""
     return db.list_user_incidents(user_id, status=status, limit=limit)
 
 
@@ -364,7 +291,7 @@ def join_incident(incident_id: str, user_id: str) -> None:
 
 
 def get_incident_detail(incident_id: str) -> dict | None:
-    """Incidente completo: campi + timeline + remediation + debriefing + team correnti."""
+    """Restituisce campi, timeline, debriefing, partecipanti e team correnti."""
     incident = db.get_incident(incident_id)
     if incident is None:
         return None
@@ -382,11 +309,7 @@ def override_classification(
     override: ClassificationOverrideRequest,
     actor: str,
 ) -> dict:
-    """Applica un override umano su severità e/o team. Loga l'azione in timeline.
-
-    Valida team rispetto al catalogo (filtra silenziosamente quelli non validi).
-    Solleva ValueError se l'incidente non esiste.
-    """
+    """Applica e registra una modifica manuale validata."""
     incident = db.get_incident(incident_id)
     if incident is None:
         raise ValueError(f"Incident {incident_id} not found")
@@ -402,8 +325,7 @@ def override_classification(
     if severity_changed:
         db.update_incident_severity(incident_id, override.severity.value)
 
-    # Applica solo transizioni reali e rimuove i duplicati mantenendo l'ordine.
-    # In questo modo anche un retry della stessa richiesta non sporca la timeline.
+    # Ignora duplicati e operazioni senza effetto, rendendo sicuri i nuovi tentativi.
     current_teams = set(before_teams)
     add_teams = list(dict.fromkeys(
         t for t in override.add_teams if t in valid_ids and t not in current_teams
@@ -438,42 +360,27 @@ def override_classification(
 
 
 def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str) -> dict:
-    """Chiude un incidente (azione esplicita). Genera il debriefing e lancia il
-    loop di apprendimento re-indicizzando l'incidente risolto.
-
-    Solleva ValueError se la transizione RESOLVED non è consentita dallo stato.
-    """
+    """Chiude l'incidente, salva il debriefing e aggiorna il RAG."""
     incident = db.get_incident(incident_id)
     if incident is None:
         raise ValueError(f"Incident {incident_id} not found")
 
-    # Guardia di stato: se RESOLVED non è una transizione valida dallo stato
-    # corrente, advance_status restituisce lo stato invariato → blocchiamo con errore.
     new_status = advance_status(incident["status"], "RESOLVED")
     if new_status == incident["status"]:
         raise ValueError(f"Cannot resolve incident in status '{incident['status']}'")
 
-    # Timestamp UTC formattato come testo "AAAA-MM-GG HH:MM:SS" (strftime = string
-    # format time). UTC per avere un riferimento orario univoco.
     resolved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     db.set_incident_status(incident_id, new_status, resolved_at=resolved_at)
     db.add_timeline_event(incident_id, "resolution", provided_by, resolution_summary)
 
-    # Debriefing: lo costruiamo e lo salviamo come JSON.
     debrief_report = _build_debrief_report(incident, resolution_summary)
     db.save_debrief_report(incident_id, json.dumps(debrief_report, ensure_ascii=False))
 
-    # Loop di apprendimento: re-indicizziamo l'incidente risolto in LanceDB (append)
-    # così diventa subito ricercabile dagli agenti per i casi futuri.
+    # Un errore nell'indice vettoriale non annulla la chiusura salvata in SQLite.
     try:
         _index_resolved_incident(incident, resolution_summary)
     except Exception:
-        # SQLite e' la sorgente di verita': un guasto del vector DB non deve
-        # annullare una chiusura gia' persistita correttamente.
         logger.exception("Failed to index resolved incident %s", incident_id)
-    # Rileggiamo l'incidente aggiornato. get_incident è tipato "dict | None", ma qui
-    # esiste di sicuro (l'abbiamo appena modificato): l'assert lo comunica al
-    # type-checker, "restringendo" il tipo a dict.
     updated = db.get_incident(incident_id)
     assert updated is not None
     return updated
@@ -494,36 +401,28 @@ def reopen_incident(incident_id: str, reopened_by: str) -> dict:
     return updated
 
 
-# ---------------------------------------------------------------------------
-# Helper interni: debriefing + indicizzazione
-# ---------------------------------------------------------------------------
+# Debriefing e indicizzazione
 
 def _build_debrief_report(incident: dict, resolution_summary: str) -> dict:
-    """Assembla un DebriefReport minimale (v1) a partire da incidente + timeline.
-    Impact, detection e root cause non sono derivati automaticamente in questa
-    versione; `resolution` contiene il riepilogo di chiusura fornito."""
-    # Severity(stringa) prova a convertire il testo nell'Enum; se il valore è
-    # mancante o non valido, ripieghiamo su SEV3 (un default ragionevole).
+    """Assembla il report minimale da incidente e timeline."""
+    # Usa SEV3 se la severità storica è assente o non valida.
     try:
         severity = Severity(incident.get("severity"))
     except (ValueError, TypeError):
         severity = Severity.SEV3
 
-    # Ricostruiamo la timeline come lista di oggetti TimelineEvent validati.
     timeline = []
     for row in db.get_timeline(incident["id"]):
         try:
             event = TimelineEvent(
                 timestamp=row["timestamp"],
                 event_type=row["event_type"],
-                # `row["actor"] or ""` → "" se il valore è None (Pydantic vuole str).
                 actor=row["actor"] or "",
                 content=row["content"] or "",
             )
             timeline.append(event)
         except Exception:
-            # `continue` salta all'iterazione successiva: scartiamo gli eventi con
-            # dati non validi (es. timestamp non parsabile) invece di bloccare tutto.
+            # Un evento storico malformato non blocca l'intero report.
             continue
 
     report = DebriefReport(
@@ -533,13 +432,11 @@ def _build_debrief_report(incident: dict, resolution_summary: str) -> dict:
         timeline=timeline,
         resolution=resolution_summary,
     )
-    # Restituiamo un dict JSON-compatibile (così il chiamante può serializzarlo).
     return report.model_dump(mode="json")
 
 
 def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
-    """Re-indicizza l'incidente risolto in 'past_incidents' (append) così che sia
-    immediatamente ricercabile dagli agenti. Stesso testo embeddato del seed."""
+    """Aggiorna l'incidente nell'indice `past_incidents`."""
     inc_for_index = {
         "id": incident["id"],
         "title": incident["title"],
@@ -547,7 +444,6 @@ def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
         "description": incident["description"],
         "resolution": resolution_summary,
     }
-    # Costruiamo il testo, lo embeddiamo e lo appendiamo a 'past_incidents'.
     vector = embed_text(_build_incident_text(inc_for_index))
     upsert_past_incident(get_db(), inc_for_index, vector)
 

@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useIncidentInvalidation } from "@/hooks/useIncidentInvalidation";
 import { incidentsApi } from "@/lib/api";
 
-// Dettaglio completo di un incidente (campi + timeline + debriefing).
 export function useIncident(id: string) {
   return useQuery({
     queryKey: ["incident", id],

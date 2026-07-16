@@ -1,10 +1,4 @@
-"""
-routes_incidents.py - CRUD incidenti + azioni di ciclo di vita.
-
-Route sottili sopra il service layer. Tutte richiedono autenticazione.
-Mappatura errori: risorsa assente -> 404; transizione di stato non valida
-(il service solleva ValueError) -> 409.
-"""
+"""Endpoint autenticati per incidenti e ciclo di vita."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -30,7 +24,6 @@ class HumanSolutionRequest(BaseModel):
 
 def _require_incident(incident_id: str, user_id: str | None = None) -> dict:
     """Restituisce il dettaglio dell'incidente o solleva 404."""
-    # Helper riusato da più route: centralizza il controllo "esiste?" → 404.
     if user_id is not None and not service.can_access_incident(incident_id, user_id):
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
     detail = service.get_incident_detail(incident_id)
@@ -43,38 +36,32 @@ def _require_incident(incident_id: str, user_id: str | None = None) -> dict:
     return detail
 
 
-@router.post("", status_code=201)   # 201 Created: una risorsa nuova è stata creata
+@router.post("", status_code=201)
 def create(body: CreateIncidentRequest, user: dict = Depends(auth.current_user)):
-    """Dichiara un nuovo incidente (stato 'open'). La classificazione avviene
-    al primo messaggio in chat (il router instrada open -> triage)."""
-    # user["id"] arriva dalla dependency: l'incidente è legato a chi lo dichiara.
+    """Dichiara un incidente da classificare in chat."""
     return service.create_incident(body.description, user["id"])
 
 
 @router.get("")
 def list_all(status: str | None = None, limit: int = 100,
             user: dict = Depends(auth.current_user)):
-    """Elenca gli incidenti, opzionalmente filtrati per status."""
-    # status e limit NON sono nel path: FastAPI li legge come query string
-    # (es. /incidents?status=active&limit=20). I default valgono se omessi.
+    """Elenca gli incidenti, eventualmente filtrati per stato."""
     return service.list_incidents(user["id"], status=status, limit=limit)
 
 
 @router.get("/{incident_id}")
 def detail(incident_id: str, user: dict = Depends(auth.current_user)):
-    """Dettaglio completo: incidente + timeline + remediation + debriefing."""
-    # {incident_id} nel path → FastAPI lo passa come argomento omonimo.
+    """Restituisce incidente, timeline, soluzione e debriefing."""
     return _require_incident(incident_id, user["id"])
 
 
 @router.post("/{incident_id}/resolve")
 def resolve(incident_id: str, body: ResolveRequest, user: dict = Depends(auth.current_user)):
-    """Chiude l'incidente e lancia il loop di apprendimento."""
+    """Chiude l'incidente e avvia il ciclo di apprendimento."""
     _require_incident(incident_id, user["id"])
     try:
         return service.resolve_incident(incident_id, body.resolution_summary, user["id"])
     except ValueError as e:
-        # Il service solleva ValueError se la transizione di stato non è valida → 409.
         raise HTTPException(status_code=409, detail=str(e))
 
 
@@ -105,7 +92,7 @@ def override_classification(
     body: ClassificationOverrideRequest,
     user: dict = Depends(auth.current_user),
 ):
-    """Override umano di severità e/o team. Loga la modifica in timeline."""
+    """Applica una modifica manuale e la registra nella timeline."""
     _require_incident(incident_id, user["id"])
     try:
         return service.override_classification(incident_id, body, user["username"])

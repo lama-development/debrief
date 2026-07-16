@@ -1,6 +1,4 @@
-"""
-routes_metrics.py - Metriche aggregate per la dashboard.
-"""
+"""Metriche aggregate per la dashboard."""
 
 from datetime import datetime
 
@@ -9,14 +7,12 @@ from fastapi import APIRouter, Depends
 from debrief import auth
 from debrief.api import service
 
-# Niente prefix qui: la route è semplicemente /metrics.
 router = APIRouter(tags=["metrics"])
 
 
 @router.get("/metrics")
 def metrics(user: dict = Depends(auth.current_user)):
-    """Conteggi (per status/severity), totale e MTTR (secondi)."""
-    # Route sottile: delega tutto il calcolo al service layer e restituisce il dict.
+    """Restituisce conteggi per stato e severità, totale e MTTR."""
     incidents = service.list_incidents(user["id"], limit=10000)
     by_status: dict[str, int] = {}
     by_severity: dict[str, int] = {}

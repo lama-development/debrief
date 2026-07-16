@@ -1,24 +1,11 @@
-"""
-config.py - Configurazione centralizzata di tutto il sistema.
+"""Configurazione centralizzata dell'applicazione."""
 
-Qui raccogliamo in un solo posto tutte le "manopole" del progetto: chiavi API,
-nomi dei modelli, percorsi dei database, soglie del RAG e parametri degli LLM.
-Avere tutto qui significa che per cambiare un comportamento (es. quale modello
-usa il triage) si modifica UNA riga sola, senza cercare nel resto del codice.
-"""
-
-# `load_dotenv` legge il file `.env` (non versionato su git, contiene i segreti)
-# e ne carica il contenuto tra le variabili d'ambiente del processo.
 from dotenv import load_dotenv
 
-# Eseguita all'import del modulo per rendere disponibili le variabili del file
-# `.env` (es. GROQ_API_KEY=...) al resto dell'applicazione.
 load_dotenv()
 
 # Modelli Groq
-# Un dizionario (dict): struttura chiave -> valore. Associa a ogni agente il
-# nome del modello LLM che deve usare. Il router (orchestrator) usa un modello
-# piccolo e veloce; gli agenti "di sostanza" usano un modello più capace.
+# Il router privilegia la velocità; gli specialisti la capacità.
 MODELS = {
     "orchestrator": "openai/gpt-oss-20b",
     "triage": "openai/gpt-oss-120b",
@@ -27,28 +14,23 @@ MODELS = {
 }
 
 # Embedding (locale)
-# Nome del modello che trasforma il testo in vettori numerici per la ricerca
-# semantica. "multilingual" perché i nostri incidenti sono in italiano.
 EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # Database
-# Percorsi su disco dei due database: SQLite (dati strutturati) e LanceDB
-# (database vettoriale per il RAG).
 SQLITE_PATH = "data/debrief.db"
 LANCEDB_PATH = "data/lancedb"
 
-# RAG (Retrieval-Augmented Generation)
-SIMILARITY_THRESHOLD = 0.35       # soglia minima per considerare un match "simile"
-INCIDENT_SIMILARITY_THRESHOLD = 0.55  # soglia selettiva per incidenti passati
-TOP_K_INCIDENTS = 3               # quanti risultati restituire per past_incidents
-TOP_K_KB = 3                      # quanti risultati restituire per knowledge_base
+# RAG
+SIMILARITY_THRESHOLD = 0.35
+INCIDENT_SIMILARITY_THRESHOLD = 0.55
+TOP_K_INCIDENTS = 3
+TOP_K_KB = 3
 
 # LLM
-# La "temperature" controlla quanto è creativa/casuale la risposta del modello:
-# 0.0 = sempre la stessa risposta (deterministico), valori alti = più varietà.
+# Routing e triage restano deterministici.
 TEMPERATURE = {
-    "orchestrator": 0.0,          # deterministico: il routing deve essere stabile
-    "triage": 0.0,                # deterministico: la classificazione deve essere stabile
-    "investigator": 0.2,          # minima variabilità
-    "resolver": 0.3,              # creatività controllata nel proporre soluzioni
+    "orchestrator": 0.0,
+    "triage": 0.0,
+    "investigator": 0.2,
+    "resolver": 0.3,
 }

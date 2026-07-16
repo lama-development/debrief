@@ -2,7 +2,6 @@ import { cn } from "@/lib/utils";
 import { STATUS_CLASS, STATUS_LABEL } from "@/lib/labels";
 import type { IncidentStatus } from "@/lib/types";
 
-// Badge stato con colore + etichetta in italiano.
 export function StatusBadge({ status, className }: { status: IncidentStatus; className?: string }) {
   return (
     <span

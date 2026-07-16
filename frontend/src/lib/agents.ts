@@ -1,8 +1,8 @@
 export interface AgentIdentity {
   label: string;
-  iconCls: string; // text + bg per icone/avatar
-  bubbleCls: string; // bubble dell'assistente in chat
-  timelineCls: string; // icona nella timeline
+  iconCls: string;
+  bubbleCls: string;
+  timelineCls: string;
 }
 
 const BOT_ICON_CLS = "border border-primary/25 bg-primary/10 text-primary";

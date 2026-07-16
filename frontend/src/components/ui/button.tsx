@@ -3,9 +3,7 @@ import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 
-// Classi comuni a tutti i bottoni + una mappa per le varianti di colore e
-// una per le dimensioni. Più semplice di una libreria di "variants": basta
-// scegliere le classi giuste dalle mappe e unirle con cn().
+// Varianti condivise di colore e dimensione.
 const baseClasses =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0";
 

@@ -1,4 +1,4 @@
-"""Retrieval strutturato usato dall'applicazione e dalla valutazione."""
+"""Recupero strutturato usato dall'applicazione e dalla valutazione."""
 
 import logging
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _retrieve(query: str, table: str, k: int, threshold: float) -> list[dict]:
-    """Esegue la pipeline comune embedding → LanceDB → risultati strutturati."""
+    """Esegue la sequenza comune: embedding, ricerca LanceDB e risultati."""
     try:
         results = search(get_db(), table, embed_text(query), k=k, threshold=threshold)
         return [
@@ -41,5 +41,5 @@ def retrieve_knowledge(
     k: int = TOP_K_KB,
     threshold: float = SIMILARITY_THRESHOLD,
 ) -> list[dict]:
-    """Recupera articoli e runbook dalla knowledge base."""
+    """Recupera articoli e procedure dalla base di conoscenza."""
     return _retrieve(query, "knowledge_base", k, threshold)

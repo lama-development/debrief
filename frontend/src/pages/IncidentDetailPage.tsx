@@ -66,6 +66,7 @@ export function IncidentDetailPage() {
   const [showTeamPicker, setShowTeamPicker] = useState(false);
   const teamPickerRef = useRef<HTMLDivElement>(null);
 
+  // Chiude il selettore dei team quando il clic avviene fuori dal pannello.
   useEffect(() => {
     if (!showTeamPicker) return;
     function onPointerDown(e: PointerEvent) {
@@ -199,7 +200,7 @@ export function IncidentDetailPage() {
 
       {/* Due pannelli: dettaglio (sinistra) + chat (destra) */}
       <div className="container flex min-h-0 flex-1 flex-col gap-2 py-2 sm:gap-4 sm:py-4">
-        {/* Selettore tab — visibile solo sotto lg */}
+        {/* Selettore scheda — visibile solo sotto lg */}
         <div className="flex rounded-lg bg-muted p-1 text-sm font-medium lg:hidden">
           <button
             type="button"
@@ -264,7 +265,7 @@ export function IncidentDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Card team coinvolti — visibile sempre, modificabile se non risolto */}
+            {/* Riquadro dei team — modificabile finché l'incidente non è risolto */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Team coinvolti</CardTitle>

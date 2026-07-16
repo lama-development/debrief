@@ -10,9 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Debrief - Incident Response</title>
     <script>
-      // Applica il tema (salvato o quello di sistema) PRIMA del render di React,
-      // così non c'è il "lampo" di tema chiaro all'avvio. Mette la classe .dark
-      // su <html>, che attiva il blocco .dark di index.css.
+      // Applica il tema prima del rendering per evitare un lampeggio iniziale.
       (function () {
         var saved = localStorage.getItem("theme");
         var dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;

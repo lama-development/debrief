@@ -1,10 +1,9 @@
-// Etichette in italiano e classi colore per stati/severità.
-// Centralizzate qui così badge, tabelle e filtri restano coerenti.
+// Etichette e colori condivisi da indicatori, tabelle e filtri.
 
 import type { IncidentStatus, Severity } from "@/lib/types";
 
 export const STATUS_LABEL: Record<IncidentStatus, string> = {
-  open: "Da classificare", // non ancora classificato dal triage (o in attesa di dettagli)
+  open: "Da classificare",
   active: "In corso",
   resolved: "Risolto",
 };
@@ -44,10 +43,10 @@ export function formatMttr(seconds: number | null): string {
   return `${total}s`;
 }
 
-// Formatta un timestamp ISO/SQL in data+ora locale compatta.
+// Formatta una data ISO/SQL in data e ora locale compatta.
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return "-";
-  // SQLite restituisce "YYYY-MM-DD HH:MM:SS" (UTC, senza timezone): lo trattiamo come UTC.
+  // Le date SQLite senza fuso sono espresse in UTC.
   const iso = value.includes("T") ? value : value.replace(" ", "T") + "Z";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return value;

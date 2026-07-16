@@ -1,16 +1,9 @@
-"""
-investigator.py - Agente investigator per la ricerca di incidenti simili.
-
-Interroga il database degli incidenti passati per trovare casi analoghi,
-identificare pattern ricorrenti e ipotizzare possibili root cause.
-Strettamente grounded: se non trova nulla, lo dice chiaramente.
-"""
+"""Agente per la ricerca di incidenti simili e schemi ricorrenti."""
 
 from agno.agent import Agent
 from agno.models.groq import Groq
 
 from debrief.config import MODELS, TEMPERATURE
-# Importiamo il tool di ricerca: lo passeremo all'agente, che potrà chiamarlo da solo.
 from debrief.tools.search import search_past_incidents
 
 
@@ -42,20 +35,16 @@ Use each source once in that list. Do not repeat long textual provenance labels 
 
 
 def create_investigator_agent() -> Agent:
-    """Crea e restituisce l'investigator agent configurato."""
+    """Crea l'agente Investigator configurato."""
     return Agent(
         name="Investigator Agent",
         model=Groq(id=MODELS["investigator"], temperature=TEMPERATURE["investigator"]),
         description="Cerca incidenti simili nel database e identifica pattern ricorrenti.",
         instructions=INVESTIGATOR_INSTRUCTIONS,
-        # tools = lista di funzioni che l'agente può invocare autonomamente. Qui
-        # gli diamo SOLO la ricerca sugli incidenti passati: è il suo unico potere.
         tools=[search_past_incidents],
-        # num_history_messages=0 → ogni run è "senza memoria" della chat precedente.
-        # Il contesto necessario glielo passiamo esplicitamente nel prompt; questo
-        # rende il comportamento più prevedibile e riduce i token.
+        # Il contesto viene passato esplicitamente nel prompt.
         num_history_messages=0,
-        markdown=True,                # la risposta è formattata in Markdown
+        markdown=True,
     )
 
 

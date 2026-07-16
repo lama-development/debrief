@@ -14,7 +14,7 @@ def get_db(db_path: str | None = None) -> lancedb.DBConnection:
 
 
 def _incident_record(inc: dict, vec: list[float]) -> dict:
-    """Costruisce il record condiviso da seed e runtime."""
+    """Costruisce il record condiviso da caricamento e aggiornamenti."""
     return {
         "id": inc["id"],
         "title": inc["title"],
@@ -29,13 +29,13 @@ def index_incidents(db: lancedb.DBConnection, incidents: list[dict], vectors: li
     """Ricrea l'indice degli incidenti passati."""
     records = [_incident_record(inc, vec) for inc, vec in zip(incidents, vectors)]
 
-    # Solo il seed sovrascrive l'intero indice.
+    # Solo il caricamento iniziale sovrascrive l'intero indice.
     db.create_table("past_incidents", data=records, mode="overwrite")
     return len(records)
 
 
 def index_knowledge_base(db: lancedb.DBConnection, docs: list[dict], vectors: list[list[float]]):
-    """Indicizza i documenti della knowledge base (runbook)."""
+    """Indicizza le procedure della base di conoscenza."""
     records = []
     for doc, vec in zip(docs, vectors):
         records.append({
@@ -85,7 +85,7 @@ def search(db: lancedb.DBConnection, table_name: str, query_vector: list[float],
 
 
 def _build_incident_text(incident: dict) -> str:
-    """Combina i campi indicizzati per il retrieval."""
+    """Combina i campi indicizzati per il recupero semantico."""
     parts = [
         incident.get("title", ""),
         incident.get("description", ""),

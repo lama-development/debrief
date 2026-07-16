@@ -5,7 +5,6 @@ import { ChevronDown, LogOut, Users } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-// Barra superiore condivisa: logo/nome (link alla dashboard), utente e logout.
 export function AppHeader() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -34,8 +33,7 @@ export function AppHeader() {
   }, [accountOpen]);
 
   async function onLogout() {
-    // Usciamo prima dalla route protetta e azzeriamo l'eventuale destinazione
-    // salvata da RequireAuth, così la sessione successiva non eredita l'incidente.
+    // Evita che il prossimo login erediti questa route protetta.
     navigate("/login", { replace: true, state: null });
     await logout();
   }

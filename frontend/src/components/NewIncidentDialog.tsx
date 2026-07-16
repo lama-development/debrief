@@ -17,9 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// Dichiara un nuovo incidente: descrizione in linguaggio naturale -> POST /incidents.
-// La classificazione (triage) avverrà al primo messaggio in chat, quindi dopo la
-// creazione apriamo direttamente il dettaglio con la chat pronta.
+// Apre subito la chat, dove avviene il triage iniziale.
 export function NewIncidentDialog() {
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState("");

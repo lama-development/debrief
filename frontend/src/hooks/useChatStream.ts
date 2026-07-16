@@ -53,10 +53,13 @@ export function hasAssistantEvents(events: TimelineEvent[]) {
   return events.some((event) => ASSISTANT_ACTORS.has(event.actor ?? ""));
 }
 
+// Ricostruisce la chat dagli eventi persistiti, escludendo quelli solo operativi.
 function seedMessages(events: TimelineEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
   events.forEach((event, index) => {
+    // Il primo evento coincide con la descrizione già mostrata nel dettaglio.
     if (index === 0) return;
+    // Questi eventi appartengono alla timeline, non alla conversazione.
     if (["involvement", "disinvolvement", "override", "reopen"].includes(event.event_type)) {
       return;
     }
@@ -77,6 +80,7 @@ function seedMessages(events: TimelineEvent[]): ChatMessage[] {
   return messages;
 }
 
+// Il reducer centralizza gli aggiornamenti che arrivano dal flusso SSE.
 function reducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "add_messages":
@@ -144,8 +148,10 @@ export function useChatStream({
     toolActive: false,
     activeAgent: null,
   }));
+  // Gli ID negativi distinguono i messaggi locali da quelli salvati nel database.
   const nextLocalId = useRef(-1);
   const activeAssistantId = useRef<number | null>(null);
+  // I riferimenti React bloccano richieste duplicate senza nuovi rendering.
   const streamInFlight = useRef(false);
   const overrideRequestsInFlight = useRef(new Set<number>());
 
@@ -168,6 +174,7 @@ export function useChatStream({
       const assistantId = expectsAssistant ? nextLocalId.current-- : null;
       activeAssistantId.current = assistantId;
 
+      // Aggiornamento ottimistico: mostra subito il messaggio e il segnaposto della risposta.
       dispatch({
         type: "add_messages",
         messages: [
@@ -194,6 +201,7 @@ export function useChatStream({
         const id = activeAssistantId.current;
         if (id !== null) dispatch({ type: "append_token", id, token });
       };
+      // Garantisce un messaggio dell'assistente prima di applicare gli eventi ricevuti.
       const ensureAssistant = () => {
         if (activeAssistantId.current !== null) return;
         const id = nextLocalId.current--;
@@ -212,6 +220,7 @@ export function useChatStream({
       };
 
       let streamFailed = false;
+      // Traduce ogni evento del protocollo SSE in un aggiornamento dello stato React.
       const onEvent = (event: ChatEvent) => {
         switch (event.type) {
           case "routing": {
@@ -234,6 +243,7 @@ export function useChatStream({
             patchAssistant({ agent: "resolver", humanHelp: event.data });
             break;
           case "phase": {
+            // Ogni fase della sequenza automatica usa un messaggio distinto.
             const id = nextLocalId.current--;
             activeAssistantId.current = id;
             dispatch({ type: "agent_changed", agent: event.agent });
@@ -274,6 +284,7 @@ export function useChatStream({
         patchAssistant({ content: "Si è verificato un errore. Riprova." });
         return false;
       } finally {
+        // Elimina il segnaposto se il flusso termina senza contenuto visibile.
         const emptyAssistantId = activeAssistantId.current;
         if (emptyAssistantId !== null) {
           dispatch({ type: "remove_if_empty", id: emptyAssistantId });
@@ -293,6 +304,7 @@ export function useChatStream({
       if (!message?.overrideProposal) return;
 
       const { severity, add_teams, remove_teams } = message.overrideProposal;
+      // La conferma applica via REST la proposta ricevuta nel flusso.
       overrideRequestsInFlight.current.add(messageId);
       dispatch({ type: "patch_message", id: messageId, patch: { overrideStatus: "pending" } });
       try {

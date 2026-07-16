@@ -19,9 +19,7 @@ import { incidentsApi, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getAgentIdentity } from "@/lib/agents";
 import type { HumanHelpRequest, IncidentStatus, TimelineEvent } from "@/lib/types";
-// Gli LLM possono scrivere l'ID con trattini tipografici Unicode (es. INC‑003)
-// invece del normale "-" ASCII. Accettiamo entrambe le forme e costruiamo poi
-// sempre un URL canonico /incidents/INC-003.
+// Normalizza anche i trattini Unicode prodotti dagli LLM.
 const INCIDENT_REFERENCE_RE = /\bINC[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212](\d{3,})\b/g;
 const EXISTING_INCIDENT_LINK_RE = /(\[INC-\d{3,}\]\([^)]+\))/g;
 const CODE_FENCE_OR_INLINE_RE = /(```[\s\S]*?```|`[^`\n]+`)/g;
@@ -62,6 +60,7 @@ function formatMessageTime(timestamp: string) {
   });
 }
 
+// Normalizza il Markdown e collega gli ID senza alterare codice o collegamenti esistenti.
 function linkIncidentReferences(markdown: string) {
   return markdown
     .split(CODE_FENCE_OR_INLINE_RE)
@@ -117,15 +116,11 @@ export function ChatPanel({
   const closed = status === "resolved";
   const activeMention = mentionAtCursor(input, cursorPosition);
 
-  // Auto-scroll in fondo a ogni aggiornamento.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, toolActive]);
 
-  // Classificazione automatica: appena si apre un incidente "open" non ancora
-  // gestito, avviamo da soli il triage sulla descrizione, nessun click richiesto.
-  // (Il backend è pensato così: il primo messaggio di chat è la descrizione e il
-  // router lo instrada al triage.)
+  // Avvia il triage al primo accesso a un incidente `open`.
   useEffect(() => {
     if (autoSent.current) return;
     if (status !== "open" || !initialDraft) return;
@@ -196,7 +191,7 @@ export function ChatPanel({
         {toolActive && <ToolBubble agent={activeAgent} />}
       </div>
 
-      {/* Input floating */}
+      {/* Campo di invio */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 via-60% to-transparent px-2 pb-2 pt-6 sm:px-3 sm:pb-3 sm:pt-8">
         <form className="relative" onSubmit={onSubmit}>
           {closed ? (

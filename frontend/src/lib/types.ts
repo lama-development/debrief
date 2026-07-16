@@ -1,5 +1,4 @@
-// Tipi allineati 1:1 agli output del backend (src/debrief/schemas.py e service.py).
-// Niente enum TS (il tsconfig usa erasableSyntaxOnly): usiamo union di stringhe.
+// Contratti allineati alle risposte del server; tipi unione al posto degli enum TS.
 
 export type Severity = "SEV1" | "SEV2" | "SEV3" | "SEV4";
 
@@ -85,7 +84,7 @@ export interface Metrics {
   total: number;
 }
 
-// Output strutturato del triage (evento SSE "triage").
+// Risposta strutturata del triage, ricevuta nell'evento SSE omonimo.
 export interface TriageData {
   title: string;
   severity: Severity;
@@ -108,7 +107,7 @@ export interface HumanHelpRequest {
   reason: string;
 }
 
-// Eventi emessi dallo streaming della chat (service.stream_chat).
+// Eventi emessi dal flusso della chat (`service.stream_chat`).
 export type ChatEvent =
   | { type: "routing"; agent: AgentRole; reason: string }
   | { type: "tool"; name: string }

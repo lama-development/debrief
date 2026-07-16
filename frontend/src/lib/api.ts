@@ -1,7 +1,4 @@
-// Client API tipizzato verso il backend FastAPI.
-// - inietta l'header Authorization: Bearer <token> quando autenticato;
-// - su 401 invoca un handler registrato (logout + redirect, vedi AuthContext);
-// - normalizza gli errori in ApiError con messaggio leggibile.
+// Chiamate a FastAPI con token bearer e gestione centralizzata degli errori.
 
 import type {
   ClassificationOverrideRequest,
@@ -12,13 +9,10 @@ import type {
   User,
 } from "@/lib/types";
 
-// URL del backend FastAPI. Per puntare a un host/porta diversi, modifica
-// direttamente questa riga.
 export const API_URL = "http://localhost:8000";
 
 const TOKEN_KEY = "debrief_token";
 
-// Errore applicativo con lo status HTTP, così la UI può distinguere i casi.
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -28,7 +22,7 @@ export class ApiError extends Error {
   }
 }
 
-// Token tenuto in localStorage (persistente tra refresh) e in cache in memoria.
+// Cache in memoria sincronizzata con localStorage.
 let authToken: string | null = localStorage.getItem(TOKEN_KEY);
 
 export function getAuthToken(): string | null {
@@ -41,7 +35,6 @@ export function setAuthToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-// Handler invocato a ogni 401 (registrato da AuthContext): logout + redirect.
 let onUnauthorized: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;
@@ -50,7 +43,7 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 interface RequestOptions {
   method?: string;
   body?: unknown;
-  auth?: boolean; // default true
+  auth?: boolean;
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -67,7 +60,6 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    // fetch rigetta solo per errori di rete (server giù, CORS, DNS...).
     throw new ApiError(0, "Impossibile contattare il server. È avviato su " + API_URL + "?");
   }
 
@@ -80,7 +72,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    // Proviamo a estrarre il campo `detail` di FastAPI; altrimenti messaggio generico.
+    // Preferisce il dettaglio restituito da FastAPI.
     let detail = `Errore ${res.status}`;
     try {
       const data = await res.json();
@@ -92,12 +84,12 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     throw new ApiError(res.status, detail);
   }
 
-  // 204 No Content (es. logout): nessun corpo da parsare.
+  // Le risposte 204 non hanno corpo.
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
-// --- Auth ---
+// Autenticazione
 export const authApi = {
   register: (username: string, password: string, team_id: string) =>
     request<{ user: User; token: string }>("/auth/register", {
@@ -116,7 +108,7 @@ export const authApi = {
   teams: () => request<Team[]>("/auth/teams", { auth: false }),
 };
 
-// --- Incidenti ---
+// Incidenti
 export const incidentsApi = {
   list: (status?: string, limit = 100) => {
     const params = new URLSearchParams();
@@ -142,7 +134,7 @@ export const incidentsApi = {
     }),
 };
 
-// --- Metriche ---
+// Metriche
 export const metricsApi = {
   get: () => request<Metrics>("/metrics"),
 };

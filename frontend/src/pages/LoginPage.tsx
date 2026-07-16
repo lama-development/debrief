@@ -45,8 +45,7 @@ export function LoginPage() {
         navigate(from, { replace: true });
       } else {
         await register(username, password, teamId);
-        // Un account appena creato può non avere accesso alla pagina richiesta
-        // dalla sessione precedente: parte sempre dalla propria dashboard.
+        // Un nuovo account parte sempre dalla propria dashboard.
         navigate("/", { replace: true });
       }
     } catch (err) {

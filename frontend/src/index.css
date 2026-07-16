@@ -2,10 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Colori del tema come variabili CSS, in canali HSL ("H S% L%"). Light mode in
-   :root, dark mode in .dark (la classe .dark viene messa su <html> dal toggle).
-   I canali HSL grezzi (senza hsl()) servono a far funzionare le opacita' tipo
-   bg-primary/90. tailwind.config.js mappa queste variabili sulle classi. */
+/* Canali HSL per temi chiaro/scuro e opacità Tailwind. */
 @layer base {
   :root {
     --background: 0 0% 100%;

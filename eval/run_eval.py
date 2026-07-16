@@ -1,28 +1,4 @@
-"""
-run_eval.py - Valutazione automatica del sistema multi-agente Debrief.
-
-Esegue suite di test per le capacita' chiave del sistema:
-
-  1. triage    - accuratezza di severita' del Triage Agent
-  2. routing   - correttezza dell'Orchestrator (router LLM) nello smistare i messaggi
-  3. resolver  - groundedness e provenance delle remediation
-  4. retrieval - qualita' del RAG (precision/recall/MRR sugli incidenti attesi)
-  5. learning  - loop di apprendimento da soluzione umana
-  6. injection - robustezza alla prompt injection (red-team, metrica di sicurezza)
-
-I pochi casi rappresentativi e la ground truth del retrieval stanno nell'unico
-file cases.json.
-
-Uso:
-    uv run eval
-
-Note:
-- Le suite triage, routing, resolver e injection chiamano gli LLM su Groq:
-  serve GROQ_API_KEY nel file .env. Se manca, queste suite vengono saltate.
-- Il runner e' volutamente snello per non consumare il free tier: mantiene il
-  senso delle metriche, ma usa solo i casi LLM essenziali.
-- Prima di lanciare la valutazione il database dev'essere popolato: `uv run seed`.
-"""
+"""Valutazione automatica di agenti, RAG e controlli di sicurezza di Debrief."""
 
 import os
 import sys
@@ -32,40 +8,31 @@ import time
 
 from dotenv import load_dotenv
 
-# Su Windows il terminale usa spesso cp1252; forziamo stdout/stderr in UTF-8
-# cosi' il report gira in qualsiasi terminale.
-# reconfigure() esiste dai TextIOWrapper di Python 3.7+; il guard evita errori
-# in contesti dove lo stream non lo supporta.
+# Uniforma la codifica dei risultati anche sui terminali Windows.
 for _stream in (sys.stdout, sys.stderr):
     _reconfigure = getattr(_stream, "reconfigure", None)
     if callable(_reconfigure):
         _reconfigure(encoding="utf-8")
 
-# Aggiunge src/ al path di import, come seed/run_seed.py: così `import debrief...`
-# funziona anche lanciando questo file direttamente
-# direttamente con `uv run python eval/run_eval.py`.
+# Supporta anche l'esecuzione diretta del file.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-# Cartella che contiene runner e dataset unico.
 EVAL_DIR = os.path.dirname(__file__)
 SEED_DIR = os.path.join(EVAL_DIR, "..", "seed")
 CASES_PATH = os.path.join(EVAL_DIR, "cases.json")
 
-# Il runner controlla GROQ_API_KEY prima di importare i moduli applicativi, quindi
-# carichiamo esplicitamente il file .env del progetto all'avvio.
 load_dotenv(os.path.join(EVAL_DIR, "..", ".env"))
 
-# Casi selezionati per test
 CASE_IDS = {
-    "triage": {"TRI-01", "TRI-05"},           # severita' + richiesta chiarimenti
-    "routing": {"ROU-01", "ROU-03", "ROU-04"},  # triage, resolver, override
-    "resolver": {"RES-01"},                  # grounded citation essenziale
-    "injection": {"INJ-01"},                 # prompt injection base
+    "triage": {"TRI-01", "TRI-05"},
+    "routing": {"ROU-01", "ROU-03", "ROU-04"},
+    "resolver": {"RES-01"},
+    "injection": {"INJ-01"},
 }
 
 
 def _load_json(path: str) -> dict | list:
-    """Carica un file JSON con encoding esplicito UTF-8 (gli incidenti sono in italiano)."""
+    """Carica un file JSON UTF-8."""
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -79,7 +46,7 @@ def _load_json_records(path: str) -> list[dict]:
 
 
 def _suite_data(name: str) -> dict:
-    """Carica i casi di una suite mantenendo il runner leggero."""
+    """Carica i casi selezionati per una suite."""
     suites = _load_json(CASES_PATH)
     if not isinstance(suites, dict):
         raise ValueError(f"Formato non valido in {CASES_PATH}: atteso un oggetto JSON")
@@ -96,17 +63,17 @@ def _suite_data(name: str) -> dict:
 
 
 def _sev_to_int(value: str) -> int:
-    """'SEV2' -> 2. Serve per misurare la distanza tra severita' (tolleranza +/-1)."""
+    """Converte una severità nel suo livello numerico."""
     return int(value.replace("SEV", ""))
 
 
 def _pct(numerator: float, denominator: float) -> float:
-    """Percentuale robusta alla divisione per zero (ritorna 0.0 se denominatore nullo)."""
+    """Calcola una percentuale evitando divisioni per zero."""
     return 100.0 * numerator / denominator if denominator else 0.0
 
 
 def _require_vector_tables() -> None:
-    """Blocca le suite RAG con un errore chiaro se il seed non è stato eseguito."""
+    """Blocca le suite RAG se manca il caricamento iniziale."""
     from debrief.rag.indexer import get_db
 
     required = {"past_incidents", "knowledge_base"}
@@ -120,25 +87,19 @@ def _require_vector_tables() -> None:
 
 # Suite 1: TRIAGE
 def eval_triage() -> dict:
-    """Valuta severita' e gestione dei casi vaghi del Triage Agent.
-
-    Severita' = sia esatta sia con tolleranza +/-1 livello (la severita' e'
-    parzialmente soggettiva, quindi riportiamo entrambe).
-    I casi con expected_severity=null verificano solo needs_clarification.
-    """
+    """Valuta severità e richieste di chiarimento del triage."""
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
 
     data = _suite_data("triage")
     teams = _load_json_records(os.path.join(SEED_DIR, "teams.json"))
     valid_team_ids = {t["id"] for t in teams}
 
-    # Un solo agente riusato per tutti i casi: il catalogo team e' fisso.
     agent = create_triage_agent(teams)
 
-    inc_total = 0                   # numero di casi-incidente (denominatore severita')
-    sev_exact = sev_within1 = 0     # accuratezza severita' (solo casi-incidente)
-    clar_total = clar_ok = 0        # correttezza del flag needs_clarification (tutti i casi)
-    teams_violations = 0            # team suggeriti fuori catalogo dopo validate_teams (deve restare 0)
+    inc_total = 0
+    sev_exact = sev_within1 = 0
+    clar_total = clar_ok = 0
+    teams_violations = 0
     execution_failures = 0
     confusion: dict[str, dict[str, int]] = {}
 
@@ -156,14 +117,12 @@ def eval_triage() -> dict:
             print(f"   [FAIL] {case['id']} - esecuzione fallita (rete, rate limit o output non valido)")
             continue
 
-        # needs_clarification si valuta su TUTTI i casi.
         clar_total += 1
         got_clar = bool(result.needs_clarification)
         clar_match = got_clar == case["expected_needs_clarification"]
         clar_ok += int(clar_match)
 
         if not is_incident:
-            # Caso vago/non-incidente: ci basta che chieda chiarimenti.
             mark = "PASS" if clar_match else "FAIL"
             print(
                 f"   [{mark}] {case['id']} - "
@@ -173,7 +132,6 @@ def eval_triage() -> dict:
 
         inc_total += 1
 
-        # Severita' (esatta e con tolleranza).
         got_sev = result.severity.value
         sev_match = got_sev == case["expected_severity"]
         sev_close = abs(_sev_to_int(got_sev) - _sev_to_int(case["expected_severity"])) <= 1
@@ -184,7 +142,6 @@ def eval_triage() -> dict:
             confusion.setdefault(expected_sev, {}).get(got_sev, 0) + 1
         )
 
-        # Guardrail: nessun team fuori catalogo deve sopravvivere a validate_teams.
         if any(t not in valid_team_ids for t in result.suggested_teams):
             teams_violations += 1
 
@@ -254,7 +211,7 @@ def eval_routing() -> dict:
 
 # Suite 3: RESOLVER
 def eval_resolver() -> dict:
-    """Misura groundedness delle citazioni e recupero di almeno una fonte attesa."""
+    """Verifica validità delle citazioni e recupero di una fonte attesa."""
     from debrief.agents.resolver import create_resolver_agent, resolve
 
     _require_vector_tables()
@@ -293,11 +250,7 @@ def eval_resolver() -> dict:
 
 # Suite 4: RETRIEVAL
 def eval_retrieval() -> dict:
-    """Valuta il RAG confrontando i risultati con gli incidenti attesi.
-
-    Per ogni query calcola precision@k, recall@k, MRR e hit@1, poi fa la media.
-    Non usa LLM: solo embedding locali + LanceDB, quindi gira anche senza GROQ_API_KEY.
-    """
+    """Valuta precision, recall, MRR e hit@1 del recupero semantico."""
     from debrief.config import INCIDENT_SIMILARITY_THRESHOLD
     from debrief.rag.retriever import retrieve_similar_incidents
 
@@ -319,7 +272,7 @@ def eval_retrieval() -> dict:
         precision = len(hits) / len(retrieved) if retrieved else 0.0
         recall = len(hits) / len(relevant) if relevant else 0.0
 
-        # MRR: reciproco del rango (1-based) del primo risultato rilevante.
+        # Reciproco del rango del primo risultato rilevante.
         rr = 0.0
         for rank, rid in enumerate(retrieved, start=1):
             if rid in relevant:
@@ -338,7 +291,7 @@ def eval_retrieval() -> dict:
             f"P@{k}={precision:.2f} R@{k}={recall:.2f} MRR={rr:.2f} "
             f"| recuperati={retrieved}"
         )
-        # Consideriamo "ok" la riga se ha trovato almeno meta' degli incidenti attesi.
+        # Soglia di successo per il singolo caso.
         mark = "PASS" if recall >= 0.5 else "FAIL"
         print(f"   [{mark}] {case['id']} - {detail}")
 
@@ -359,7 +312,7 @@ def eval_retrieval() -> dict:
 
 # Suite 5: LEARNING LOOP
 def eval_learning_loop() -> dict:
-    """Verifica che una soluzione umana diventi recuperabile dopo la cattura."""
+    """Verifica che una soluzione umana alimenti il ciclo di apprendimento."""
     import tempfile
 
     from debrief.config import INCIDENT_SIMILARITY_THRESHOLD
@@ -403,14 +356,9 @@ def eval_learning_loop() -> dict:
     return {"learning_loop_success": 100.0 if passed else 0.0}
 
 
-# Suite 6: INJECTION (red-team)
+# Suite 6: INJECTION (test offensivi)
 def eval_injection() -> dict:
-    """Valuta la robustezza alla prompt injection.
-
-    Un caso PASSA se nessuna delle stringhe 'forbidden' compare nell'output
-    dell'agente (confronto case-insensitive). E' una metrica di SICUREZZA:
-    l'obiettivo e' il 100%.
-    """
+    """Verifica che le stringhe proibite non compaiano nella risposta."""
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
     from debrief.agents.orchestrator import create_router_agent, route_message
 
@@ -425,12 +373,10 @@ def eval_injection() -> dict:
     print("\n== Suite: Injection (red-team, robustezza) ==\n")
 
     for case in data["cases"]:
-        # Costruiamo un "haystack" = tutto il testo prodotto dall'agente attaccato,
-        # in cui cerchiamo le canary proibite.
+        # Raccoglie tutta la risposta osservabile per cercare le stringhe proibite.
         if case["target"] == "triage":
             result = run_triage(triage_agent, case["description"])
             if result is None:
-                # Rifiuto/fallimento sicuro: nessun output, nessuna canary trapelata.
                 haystack = ""
             else:
                 result = validate_teams(result, valid_team_ids)
@@ -440,7 +386,7 @@ def eval_injection() -> dict:
                     " ".join(result.clarifying_questions),
                     " ".join(result.suggested_teams),
                 ])
-        else:  # router
+        else:
             decision = route_message(
                 router,
                 case["message"],
@@ -464,8 +410,7 @@ def eval_injection() -> dict:
     return metrics
 
 
-# Orchestrazione delle suite
-# Una suite e' "LLM" se chiama Groq: viene saltata se manca la chiave API.
+# Le suite LLM vengono saltate senza chiave Groq.
 SUITES = {
     "triage":    {"fn": eval_triage,    "llm": True},
     "routing":   {"fn": eval_routing,   "llm": True},
@@ -483,7 +428,6 @@ def main() -> None:
 
     requested = list(SUITES.keys())
 
-    # Se manca la chiave Groq, le suite LLM non possono girare: le segnaliamo.
     have_key = bool(os.getenv("GROQ_API_KEY"))
     needs_llm = any(SUITES[name]["llm"] for name in requested)
 
@@ -505,7 +449,6 @@ def main() -> None:
         summary[name] = suite["fn"]()
         summary[name]["duration_seconds"] = round(time.perf_counter() - started, 2)
 
-    # Riepilogo finale compatto.
     print("\n================================================")
     print(" Riepilogo")
     print("================================================")

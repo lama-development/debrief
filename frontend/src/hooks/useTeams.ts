@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import { authApi } from "@/lib/api";
 
-// Unica sorgente frontend per il catalogo team esposto dal backend.
 export function useTeams() {
   const query = useQuery({
     queryKey: ["teams"],

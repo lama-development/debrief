@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useIncidentInvalidation } from "@/hooks/useIncidentInvalidation";
 import { incidentsApi } from "@/lib/api";
 
-// Lista incidenti, opzionalmente filtrata per status.
+// Lista degli incidenti, eventualmente filtrata per stato.
 export function useIncidents(status?: string) {
   return useQuery({
     queryKey: ["incidents", status ?? "all"],
@@ -11,7 +11,7 @@ export function useIncidents(status?: string) {
   });
 }
 
-// Crea un nuovo incidente; invalida lista e metriche al successo.
+// Dopo la creazione aggiorna lista e metriche memorizzate nella cache.
 export function useCreateIncident() {
   const invalidate = useIncidentInvalidation();
   return useMutation({
