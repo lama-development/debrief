@@ -140,9 +140,9 @@ prototipo.
 Non sono definiti script frontend `test`, `typecheck`, `preview` o `start`. Il
 controllo TypeScript fa parte di `npm run build`.
 
-Il repository include `pytest` e `httpx` nel gruppo di sviluppo, ma non contiene
-ancora test pytest. `uv run eval` misura capacità AI specifiche e non sostituisce
-test unitari o di integrazione.
+Il repository include `httpx` nel gruppo di sviluppo, ma non contiene una suite
+di test backend o frontend. `uv run eval` misura capacità AI specifiche e non
+sostituisce test unitari o di integrazione.
 
 ## 5. Struttura del repository
 

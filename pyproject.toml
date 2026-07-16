@@ -34,5 +34,4 @@ packages = ["src/debrief", "seed", "eval"]
 [dependency-groups]
 dev = [
     "httpx",
-    "pytest",
 ]

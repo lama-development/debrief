@@ -137,6 +137,7 @@
     "description": "Da questa mattina i tablet del magazzino aprono Genius Logistics ma gli ordini restano in caricamento e non vengono aggiornati. La rete Wi-Fi risulta disponibile e la navigazione web funziona. Il problema interessa tutti i tablet, mentre Genius dalle postazioni cablate è operativo.",
     "severity": "SEV2",
     "status": "resolved",
+    "resolution": "Il team di sviluppo Genius ha individuato un blocco del servizio di sincronizzazione usato da Genius Logistics. Il servizio è stato riavviato e la coda degli ordini è stata riallineata. Dopo l'intervento gli ordini sono tornati visibili e aggiornabili su tutti i tablet del magazzino.",
     "created_at": "2026-07-10T07:45:00",
     "involved_teams": ["PRODUCTION", "IT_INTERNAL", "IT_DEV"]
   },

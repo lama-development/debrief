@@ -568,7 +568,7 @@ valuta la provenance dei runbook.
 ### 9.2 Interpretazione corretta
 
 L'harness misura capacità AI specifiche, ma non sostituisce una suite di test del
-software. Il repository non contiene oggi test pytest o frontend per:
+software. Il repository non contiene oggi test automatici backend o frontend per:
 
 - API e validazione;
 - autenticazione e autorizzazione;
