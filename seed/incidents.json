@@ -8,10 +8,7 @@
     "resolution": "Il problema è causato dal cambio password dell'utente: il token di autenticazione memorizzato sul dispositivo non viene aggiornato automaticamente. Per risolvere: Impostazioni Windows → Account → Accesso aziendale o dell'istituto di istruzione → selezionare l'account aziendale → Disconnetti. Riavviare il PC e ricollegare l'account con le nuove credenziali.",
     "created_at": "2025-09-10T09:15:00",
     "resolved_at": "2025-09-10T10:00:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-002",
@@ -22,10 +19,7 @@
     "resolution": "Explorer.exe va in crash/freeze in modo non recuperabile: riavviare il processo da Task Manager non risolve. L'unica soluzione è riavviare il PC. Workaround immediato mentre si aspetta il riavvio: accedere al file server tramite TSPlus Remote Desktop.",
     "created_at": "2026-05-14T10:30:00",
     "resolved_at": "2026-05-15T09:00:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-003",
@@ -36,10 +30,7 @@
     "resolution": "Il problema è causato da una corruzione o disallineamento del file AppControl.ini su srv-tsplus, che gestisce le autorizzazioni delle applicazioni remote. Per risolvere: accedere a srv-tsplus con utenza amministrativa, aprire TSPlus AdminTool, assegnare un'applicazione qualsiasi a un utente qualsiasi e poi rimuoverla (o qualsiasi operazione che forzi il salvataggio). Questo fa rigenerare il file AppControl.ini. Attendere circa 10 minuti per la propagazione: dopodiché la Remote App torna a funzionare per tutti gli utenti.",
     "created_at": "2025-11-20T09:00:00",
     "resolved_at": "2025-11-20T10:15:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-004",
@@ -50,39 +41,29 @@
     "resolution": "Non è possibile aggirare il blocco lato client: occorre che il provider Microsoft resetti l'MFA dell'utenza dal pannello di amministrazione. Aperto ticket a 2000net per il reset dell'MFA dell'account. Una volta effettuato il reset, l'utente può procedere alla configurazione dell'app Authenticator senza che venga richiesto un codice preesistente.",
     "created_at": "2025-10-08T10:30:00",
     "resolved_at": "2025-10-08T14:00:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-005",
     "title": "Access Point AP15-MagazzinoMP offline: problemi di connessione sui tablet",
     "description": "L'Access Point 'AP15-MagazzinoMP' risulta offline dalla mattinata sulla dashboard UniFi Network. Il dispositivo non è raggiungibile (Device Unreachable), pertanto non è possibile eseguirne il riavvio da remoto. Contestualmente vengono segnalati problemi di connessione sui tablet serviti dall'Access Point.",
-    "severity": "SEV3",
+    "severity": "SEV2",
     "status": "resolved",
     "resolution": "La causa è riconducibile a un danneggiamento accidentale: durante l'installazione di una linea, il giorno precedente, il ripetitore è stato piegato dagli operai. In seguito alla verifica del dispositivo, l'Access Point è tornato online e risulta regolarmente funzionante.",
     "created_at": "2026-06-30T09:00:00",
     "resolved_at": "2026-06-30T12:00:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-006",
-    "title": "Timbratore del trituratore non raggiungibile: timbrature mancanti",
-    "description": "Dal controllo delle timbrature risultano registrazioni mancanti, soprattutto in uscita, provenienti dal timbratore del trituratore. L'anomalia impedisce la corretta chiusura delle giornate nel gestionale. Durante la verifica sul campo il dispositivo risulta alimentato e la porta dello switch presenta il link di rete attivo, ma il timbratore non è raggiungibile neppure da un PC collegato alla stessa VLAN. Inizialmente non è possibile stabilire se la causa dipenda dal dispositivo, dalla configurazione dello switch o dalla tratta del cavo; viene quindi coinvolta 2000net per ulteriori verifiche.",
+    "title": "Timbratore della produzione non raggiungibile: timbrature mancanti",
+    "description": "Dal controllo delle timbrature risultano registrazioni mancanti, soprattutto in uscita, provenienti dal timbratore della produzione. L'anomalia impedisce la corretta chiusura delle giornate nel gestionale. Durante la verifica sul campo il dispositivo risulta alimentato e la porta dello switch presenta il link di rete attivo, ma il timbratore non è raggiungibile neppure da un PC collegato alla stessa VLAN. Inizialmente non è possibile stabilire se la causa dipenda dal dispositivo, dalla configurazione dello switch o dalla tratta del cavo; viene quindi coinvolta 2000net per ulteriori verifiche.",
     "severity": "SEV3",
     "status": "resolved",
     "resolution": "Il cavo di rete del timbratore era collegato alla porta 6 dello switch anziché alla porta 7, dedicata ai timbratori e configurata sulla VLAN corretta. Di conseguenza il dispositivo non era raggiungibile e non riusciva a trasmettere le timbrature al gestionale. Il cavo è stato spostato sulla porta corretta: il timbratore ha ripreso a funzionare e la registrazione delle timbrature è stata verificata con esito positivo sul gestionale.",
     "created_at": "2026-06-29T14:00:00",
     "resolved_at": "2026-06-30T10:00:00",
-    "involved_teams": [
-      "PRODUCTION",
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["PRODUCTION", "IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-007",
@@ -93,10 +74,7 @@
     "resolution": "La finestra è stata recuperata tramite Task Manager: è stato prima minimizzato Embyon e successivamente è stata massimizzata la finestra del prelievo. La visualizzazione è così tornata corretta per l'utente.",
     "created_at": "2026-06-30T13:00:00",
     "resolved_at": "2026-06-30T14:00:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-008",
@@ -107,10 +85,7 @@
     "resolution": "Nel Gestore credenziali di Windows erano rimaste credenziali Microsoft 365 associate alla password precedente. Sono state rimosse le voci obsolete relative a Office e Azure AD, quindi il PC è stato riavviato. Al successivo avvio l'utente ha effettuato nuovamente l'accesso e la sincronizzazione di Outlook e Teams è stata verificata con esito positivo.",
     "created_at": "2026-01-19T08:40:00",
     "resolved_at": "2026-01-19T09:35:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-009",
@@ -121,10 +96,7 @@
     "resolution": "Sul server era rimasta attiva una sessione disconnessa dell'utente con il processo Explorer non responsivo. La sessione è stata terminata dalla console amministrativa TSPlus. L'utente ha eseguito un nuovo accesso e il desktop remoto e gli applicativi sono tornati visibili e utilizzabili.",
     "created_at": "2026-02-03T11:10:00",
     "resolved_at": "2026-02-03T11:45:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-010",
@@ -135,10 +107,7 @@
     "resolution": "L'unità di scorta conservava un indirizzo IP appartenente alla rete di collaudo e quindi non poteva comunicare con la VLAN di produzione. Il fornitore ha configurato indirizzo IP, gateway e subnet corretti. Dopo il riavvio sono stati verificati sia il ping sia l'invio di una pesata di prova al gestionale.",
     "created_at": "2026-03-12T07:20:00",
     "resolved_at": "2026-03-12T09:05:00",
-    "involved_teams": [
-      "PRODUCTION",
-      "IT_INTERNAL"
-    ]
+    "involved_teams": ["PRODUCTION", "IT_INTERNAL"]
   },
   {
     "id": "INC-011",
@@ -149,10 +118,7 @@
     "resolution": "Una porta uplink dello switch negoziava a 100 Mbps invece di 1 Gbps a causa di una terminazione difettosa del cavo. 2000net ha rifatto la terminazione e la porta ha negoziato correttamente. L'apertura dei file condivisi è stata provata da due postazioni ed è tornata nei tempi normali.",
     "created_at": "2026-04-08T14:15:00",
     "resolved_at": "2026-04-08T17:10:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-012",
@@ -163,23 +129,16 @@
     "resolution": "L'unità di rete memorizzava un vecchio percorso basato sul nome breve del server, non più risolto dalla postazione. È stata rimossa e ricreata usando il percorso UNC corretto. La cartella è stata riaperta e sono state verificate lettura e scrittura di un file di prova.",
     "created_at": "2026-04-22T09:25:00",
     "resolved_at": "2026-04-22T10:00:00",
-    "involved_teams": [
-      "IT_INTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL"]
   },
   {
     "id": "INC-013",
-    "title": "FortiClient rifiuta la connessione VPN per certificato scaduto",
-    "description": "Un dipendente in smart working non riesce ad avviare la VPN. FortiClient interrompe la connessione durante la validazione e segnala che il certificato del gateway non è valido perché scaduto. Il problema è riprodotto anche da una seconda postazione esterna.",
+    "title": "Genius Logistics non sincronizza gli ordini sui tablet del magazzino",
+    "description": "Da questa mattina i tablet del magazzino aprono Genius Logistics ma gli ordini restano in caricamento e non vengono aggiornati. La rete Wi-Fi risulta disponibile e la navigazione web funziona. Il problema interessa tutti i tablet, mentre Genius dalle postazioni cablate è operativo.",
     "severity": "SEV2",
     "status": "resolved",
-    "resolution": "2000net ha verificato la scadenza del certificato pubblicato sul FortiGate, lo ha rinnovato e associato nuovamente al portale SSL-VPN. Dopo il riavvio del servizio, due utenti hanno completato la connessione e raggiunto le risorse interne.",
-    "created_at": "2026-02-16T08:05:00",
-    "resolved_at": "2026-02-16T10:20:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "created_at": "2026-07-10T07:45:00",
+    "involved_teams": ["PRODUCTION", "IT_INTERNAL", "IT_DEV"]
   },
   {
     "id": "INC-014",
@@ -190,10 +149,7 @@
     "resolution": "Il router domestico bloccava il traffico necessario alla VPN tramite una funzione di protezione avanzata. Disabilitata temporaneamente la funzione e aggiornato il firmware del router, FortiClient ha completato la connessione. È stato confermato che il gateway aziendale non presentava anomalie.",
     "created_at": "2026-03-05T16:10:00",
     "resolved_at": "2026-03-05T17:30:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   },
   {
     "id": "INC-015",
@@ -204,66 +160,6 @@
     "resolution": "La rete dell'albergo usava la stessa sottorete IP di una rete interna aziendale, creando un conflitto di instradamento. Come workaround l'utente si è collegato tramite hotspot mobile e ha raggiunto tutte le risorse. È stato confermato che non erano necessarie modifiche al FortiGate.",
     "created_at": "2026-05-07T18:30:00",
     "resolved_at": "2026-05-07T19:05:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
-  },
-  {
-    "id": "INC-016",
-    "title": "Genius Logistics non sincronizza gli ordini sui tablet del magazzino",
-    "description": "Da questa mattina i tablet del magazzino aprono Genius Logistics ma gli ordini restano in caricamento e non vengono aggiornati. La rete Wi-Fi risulta disponibile e la navigazione web funziona. Il problema interessa tutti i tablet, mentre Genius dalle postazioni cablate è operativo.",
-    "severity": "SEV2",
-    "status": "active",
-    "created_at": "2026-07-10T07:45:00",
-    "involved_teams": [
-      "PRODUCTION",
-      "IT_DEV"
-    ]
-  },
-  {
-    "id": "INC-017",
-    "title": "Backup Veeam notturno di srv-db terminato con errore",
-    "description": "Il controllo mattutino mostra che il job Veeam di srv-db è terminato con errore durante la notte. Gli applicativi Genius sono attualmente disponibili e non risultano perdite di dati, ma non è presente un backup valido dell'ultima esecuzione. È in corso la verifica dello spazio sul repository.",
-    "severity": "SEV2",
-    "status": "active",
-    "created_at": "2026-07-10T08:10:00",
-    "involved_teams": [
-      "IT_INTERNAL",
-      "IT_EXTERNAL"
-    ]
-  },
-  {
-    "id": "INC-018",
-    "title": "Stampante etichette della spedizione stampa codici a barre illeggibili",
-    "description": "La stampante termica dell'area spedizioni produce etichette con righe verticali e codici a barre che il lettore non riconosce. Il reparto sta usando temporaneamente una seconda stampante, con rallentamenti nella preparazione dei bancali. La pulizia esterna non ha risolto.",
-    "severity": "SEV3",
-    "status": "active",
-    "created_at": "2026-07-10T09:20:00",
-    "involved_teams": [
-      "PRODUCTION",
-      "IT_INTERNAL"
-    ]
-  },
-  {
-    "id": "INC-019",
-    "title": "Postazione laboratorio si riavvia durante l'analisi",
-    "description": "Il laboratorio segnala che il PC collegato allo strumento si è riavviato due volte mentre era in corso un'analisi. Non è ancora chiaro se compaia un errore, se i risultati siano stati salvati o se il problema riguardi anche altre postazioni.",
-    "status": "open",
-    "created_at": "2026-07-10T10:05:00",
-    "involved_teams": [
-      "LAB",
-      "IT_INTERNAL"
-    ]
-  },
-  {
-    "id": "INC-020",
-    "title": "Segnalata lentezza generica negli uffici amministrativi",
-    "description": "Un utente riferisce che 'da stamattina è tutto lento'. Non sono ancora stati indicati il programma interessato, il numero di persone coinvolte o eventuali messaggi di errore.",
-    "status": "open",
-    "created_at": "2026-07-10T10:40:00",
-    "involved_teams": [
-      "IT_INTERNAL"
-    ]
+    "involved_teams": ["IT_INTERNAL", "IT_EXTERNAL"]
   }
 ]

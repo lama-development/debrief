@@ -29,7 +29,7 @@ from debrief.agents.investigator import create_investigator_agent, build_investi
 from debrief.agents.resolver import create_resolver_agent, build_resolution_prompt
 from debrief.api.lifecycle import advance_status
 from debrief.rag.indexer import get_db, upsert_past_incident, _build_incident_text
-from debrief.schemas import AgentRole, ClassificationOverrideRequest, OverrideParams, DebriefReport, RoutingDecision, Severity, TimelineEvent
+from debrief.schemas import AgentRole, ClassificationOverrideRequest, DebriefReport, RoutingDecision, Severity, TimelineEvent
 from debrief.tools.embedding import embed_text
 
 
@@ -479,39 +479,19 @@ def resolve_incident(incident_id: str, resolution_summary: str, provided_by: str
     return updated
 
 
-# reopen_incident delega alla logica generica di transizione esplicita.
 def reopen_incident(incident_id: str, reopened_by: str) -> dict:
-    return _explicit_transition(incident_id, "REOPENED", reopened_by)
-
-
-def _explicit_transition(incident_id: str, event: str, actor: str) -> dict:
-    """Applica un evento esplicito (REOPENED) con guardia di transizione."""
+    """Riapre un incidente risolto con guardia di transizione."""
     incident = db.get_incident(incident_id)
     if incident is None:
         raise ValueError(f"Incident {incident_id} not found")
-    new_status = advance_status(incident["status"], event)
-    # Stessa guardia di resolve: se la transizione non è permessa, errore (→ HTTP 409).
+    new_status = advance_status(incident["status"], "REOPENED")
     if new_status == incident["status"]:
-        raise ValueError(f"Cannot apply {event} from status '{incident['status']}'")
+        raise ValueError(f"Cannot apply REOPENED from status '{incident['status']}'")
     db.set_incident_status(incident_id, new_status)
-    if event == "REOPENED":
-        db.add_timeline_event(incident_id, "reopen", actor, "Incidente riaperto")
-    # Come in resolve_incident: l'incidente esiste di sicuro qui (assert = narrowing).
+    db.add_timeline_event(incident_id, "reopen", reopened_by, "Incidente riaperto")
     updated = db.get_incident(incident_id)
     assert updated is not None
     return updated
-
-
-def get_metrics() -> dict:
-    """Metriche per la dashboard: conteggi e MTTR."""
-    by_status = db.count_by_column("status")
-    return {
-        "by_status": by_status,
-        "by_severity": db.count_by_column("severity"),
-        "mttr_seconds": db.mttr_seconds(),
-        # sum(dict.values()) somma tutti i conteggi → totale incidenti.
-        "total": sum(by_status.values()),
-    }
 
 
 # ---------------------------------------------------------------------------

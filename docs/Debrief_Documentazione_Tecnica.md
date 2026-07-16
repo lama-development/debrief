@@ -417,7 +417,7 @@ contratto fa parte del consolidamento futuro.
 `uv run seed` usa:
 
 - 7 team in `seed/teams.json`;
-- 20 incidenti in `seed/incidents.json`;
+- 15 incidenti in `seed/incidents.json`;
 - 7 runbook in `seed/knowledge_base/`.
 
 Distribuzione degli incidenti:

@@ -3,7 +3,7 @@ import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export interface SelectOption<T extends string> {
+interface SelectOption<T extends string> {
   value: T;
   label: ReactNode;
   title?: string;

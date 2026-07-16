@@ -7,15 +7,12 @@ Avere tutto qui significa che per cambiare un comportamento (es. quale modello
 usa il triage) si modifica UNA riga sola, senza cercare nel resto del codice.
 """
 
-# `os` è il modulo standard di Python per dialogare con il sistema operativo:
-# qui lo usiamo per leggere le variabili d'ambiente (le "env variables").
-import os
 # `load_dotenv` legge il file `.env` (non versionato su git, contiene i segreti)
 # e ne carica il contenuto tra le variabili d'ambiente del processo.
 from dotenv import load_dotenv
 
-# Eseguita all'import del modulo: da qui in poi os.getenv() "vede" anche le
-# variabili scritte nel file .env (es. GROQ_API_KEY=...).
+# Eseguita all'import del modulo per rendere disponibili le variabili del file
+# `.env` (es. GROQ_API_KEY=...) al resto dell'applicazione.
 load_dotenv()
 
 # Modelli Groq

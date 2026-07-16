@@ -1,16 +1,13 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
+import { useIncidentInvalidation } from "@/hooks/useIncidentInvalidation";
 import { incidentsApi } from "@/lib/api";
 import type { ClassificationOverrideRequest } from "@/lib/types";
 
 export function useUpdateClassification(id: string) {
-  const qc = useQueryClient();
+  const invalidate = useIncidentInvalidation(id);
   return useMutation({
     mutationFn: (body: ClassificationOverrideRequest) => incidentsApi.patchClassification(id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["incident", id] });
-      qc.invalidateQueries({ queryKey: ["incidents"] });
-      qc.invalidateQueries({ queryKey: ["metrics"] });
-    },
+    onSuccess: invalidate,
   });
 }

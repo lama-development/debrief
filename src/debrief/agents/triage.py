@@ -125,7 +125,7 @@ def run_triage(agent: Agent, incident_description: str) -> TriageOutput | None:
         logger.error("Unexpected triage response type: %s", type(response.content))
         return None
 
-    except Exception as e:
+    except Exception:
         # Qualunque errore (rete, JSON malformato, validazione fallita) → None.
         # Il chiamante (orchestrator/service) gestisce il None mostrando un messaggio.
         logger.exception("Triage failed")

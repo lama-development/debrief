@@ -103,7 +103,7 @@ uv sync
 uv run seed
 ```
 
-Il seed carica 7 team e 20 incidenti in SQLite, indicizza i 15 incidenti risolti
+Il seed carica 7 team e 15 incidenti in SQLite, indicizza i 15 incidenti risolti
 e 7 runbook in LanceDB ed esegue uno smoke test del retrieval. Al primo utilizzo,
 il modello di embedding viene scaricato e poi mantenuto nella cache locale.
 

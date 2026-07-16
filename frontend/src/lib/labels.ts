@@ -17,13 +17,6 @@ export const STATUS_CLASS: Record<IncidentStatus, string> = {
     "border border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200",
 };
 
-export const SEVERITY_LABEL: Record<Severity, string> = {
-  SEV1: "SEV1",
-  SEV2: "SEV2",
-  SEV3: "SEV3",
-  SEV4: "SEV4",
-};
-
 export const SEVERITY_TOOLTIP: Record<Severity, string> = {
   SEV1: "Critico",
   SEV2: "Alto",

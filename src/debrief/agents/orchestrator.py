@@ -167,7 +167,7 @@ def route_message(
             override_params=override_params,
         )
 
-    except Exception as e:
+    except Exception:
         # Mai lasciare l'utente senza risposta: in caso di errore usiamo il
         # routing deterministico basato sullo stato.
         logger.exception("Router failed, using status fallback")

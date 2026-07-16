@@ -17,7 +17,6 @@ import sqlite3   # driver SQLite incluso in Python
 import os         # per creare cartelle / leggere env
 import re         # espressioni regolari (regex), qui per estrarre il numero dall'ID
 import json       # per serializzare/deserializzare i debriefing come testo JSON
-from datetime import datetime
 
 from debrief.config import SQLITE_PATH
 
@@ -138,11 +137,6 @@ def load_teams(conn: sqlite3.Connection, teams_path: str):
 
 def load_incidents(conn: sqlite3.Connection, incidents_path: str):
     """Carica gli incidenti seed in SQLite rispettando lo `status` di ciascuno.
-
-    Il dataset di seed contiene un mix dei 3 stati per mostrare tutti i casi:
-    - 'resolved' → incidenti passati e chiusi (con resolution + debriefing);
-    - 'active'   → incidenti classificati e in lavorazione (senza risoluzione);
-    - 'open'     → incidenti dichiarati ma non ancora classificati (senza categoria/severità).
     Lo status di default è 'resolved' se il campo manca."""
     with open(incidents_path, encoding="utf-8") as f:
         incidents = json.load(f)
@@ -628,48 +622,6 @@ def delete_session(token: str, db_path: str | None = None):
     try:
         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
         conn.commit()
-    finally:
-        conn.close()
-
-
-# --- Metriche (per la dashboard / routes_metrics) ---
-
-def count_by_column(column: str, db_path: str | None = None) -> dict[str, int]:
-    """Conteggio incidenti raggruppati per una colonna (status/severity)."""
-    # Controllo di sicurezza: il nome colonna finisce DENTRO la query (non come
-    # placeholder ?, perché i ? valgono solo per i valori, non per i nomi di
-    # colonna). Quindi accettiamo solo una "whitelist" fissa per evitare injection.
-    if column not in {"status", "severity"}:
-        raise ValueError(f"Unsupported metric column: {column}")
-    conn = get_connection(db_path)
-    try:
-        # GROUP BY raggruppa le righe per valore della colonna; COUNT(*) conta
-        # quante righe per gruppo. "AS k"/"AS n" sono alias per le colonne risultato.
-        rows = conn.execute(
-            f"SELECT {column} AS k, COUNT(*) AS n FROM incidents GROUP BY {column}"
-        ).fetchall()
-        # Dict comprehension: costruisce {valore: conteggio}. `r["k"] or "unknown"`
-        # mette "unknown" quando il valore è NULL/vuoto.
-        return {(r["k"] or "unknown"): r["n"] for r in rows}
-    finally:
-        conn.close()
-
-
-def mttr_seconds(db_path: str | None = None) -> float | None:
-    """Mean Time To Resolution medio (secondi) sugli incidenti con resolved_at valorizzato.
-    Restituisce None se non ci sono incidenti risolti."""
-    conn = get_connection(db_path)
-    try:
-        # julianday() converte una data in un numero di giorni; la differenza tra
-        # risoluzione e creazione * 86400 (secondi in un giorno) dà la durata in
-        # secondi. AVG() ne fa la media su tutti gli incidenti risolti.
-        row = conn.execute(
-            """SELECT AVG((julianday(resolved_at) - julianday(created_at)) * 86400.0) AS mttr
-               FROM incidents
-               WHERE resolved_at IS NOT NULL AND resolved_at != ''"""
-        ).fetchone()
-        # Se non ci sono righe risolte, AVG restituisce NULL → ritorniamo None.
-        return row["mttr"] if row and row["mttr"] is not None else None
     finally:
         conn.close()
 

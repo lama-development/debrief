@@ -480,7 +480,7 @@ Per aggiungere incidenti seed:
 Il dataset corrente contiene:
 
 - 7 team;
-- 20 incidenti: 15 `resolved`, 3 `active`, 2 `open`;
+- 15 incidenti `resolved`;
 - 7 runbook;
 - 15 record iniziali in `past_incidents`.
 

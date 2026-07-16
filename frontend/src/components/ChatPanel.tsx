@@ -10,47 +10,21 @@ import { useAuth } from "@/auth/AuthContext";
 import { TriageCard } from "@/components/TriageCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { streamChat } from "@/lib/chat";
+import {
+  hasAssistantEvents,
+  useChatStream,
+  type ChatMessage,
+} from "@/hooks/useChatStream";
 import { incidentsApi, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getAgentIdentity } from "@/lib/agents";
-import type {
-  ChatEvent,
-  HumanHelpRequest,
-  IncidentStatus,
-  OverrideProposal,
-  TimelineEvent,
-  TriageData,
-} from "@/lib/types";
-
-interface ChatMessage {
-  id: number;
-  role: "user" | "assistant";
-  agent?: string;
-  content: string;
-  timestamp: string;
-  senderId?: string;
-  senderUsername?: string;
-  senderTeam?: string;
-  triage?: TriageData;
-  overrideProposal?: OverrideProposal;
-  humanHelp?: HumanHelpRequest;
-  overrideStatus?: "idle" | "pending" | "confirmed" | "cancelled";
-  isFinalResolution?: boolean;
-}
-
-const ASSISTANT_ACTORS = new Set(["triage", "investigator", "resolver", "debrief"]);
-const CLOSED_STATUSES: IncidentStatus[] = ["resolved"];
+import type { HumanHelpRequest, IncidentStatus, TimelineEvent } from "@/lib/types";
 // Gli LLM possono scrivere l'ID con trattini tipografici Unicode (es. INC‑003)
 // invece del normale "-" ASCII. Accettiamo entrambe le forme e costruiamo poi
 // sempre un URL canonico /incidents/INC-003.
 const INCIDENT_REFERENCE_RE = /\bINC[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212](\d{3,})\b/g;
 const EXISTING_INCIDENT_LINK_RE = /(\[INC-\d{3,}\]\([^)]+\))/g;
 const CODE_FENCE_OR_INLINE_RE = /(```[\s\S]*?```|`[^`\n]+`)/g;
-// Allineata al backend: la mention può seguire spazi o punteggiatura, ma non
-// deve essere parte di un indirizzo/email o di una doppia @.
-const DEBRIEF_MENTION_RE = /(^|[^\w@])@debrief\b/i;
-
 function mentionAtCursor(value: string, cursor: number) {
   const match = value.slice(0, cursor).match(/(^|\s)@([a-zA-Z0-9_-]*)$/);
   if (!match || !"debrief".startsWith(match[2].toLowerCase())) return null;
@@ -108,76 +82,45 @@ function linkIncidentReferences(markdown: string) {
     .join("");
 }
 
-// Costruisce la cronologia iniziale della chat dagli eventi di timeline.
-function seedMessages(events: TimelineEvent[]): ChatMessage[] {
-  const out: ChatMessage[] = [];
-  events.forEach((ev, idx) => {
-    // idx 0 = dichiarazione dell'incidente (= la descrizione): è già mostrata
-    // nella card "Descrizione" e nel milestone "Incidente dichiarato", quindi non
-    // la ripetiamo come bolla di chat.
-    if (idx === 0) return;
-    if (ev.event_type === "involvement") return; // mostrato nella timeline a sinistra
-    if (ev.event_type === "disinvolvement") return;
-    if (ev.event_type === "override") return;
-    if (ev.event_type === "reopen") return;
-    const isAssistant = ASSISTANT_ACTORS.has(ev.actor ?? "");
-    out.push({
-      id: ev.id,
-      role: isAssistant ? "assistant" : "user",
-      agent: isAssistant ? (ev.actor ?? undefined) : undefined,
-      timestamp: ev.timestamp,
-      senderId: isAssistant ? undefined : (ev.actor_user_id ?? ev.actor ?? undefined),
-      senderUsername: isAssistant ? undefined : (ev.actor_username ?? ev.actor ?? "Utente"),
-      senderTeam: isAssistant ? undefined : (ev.actor_team_name ?? undefined),
-      content: ev.content ?? "",
-      isFinalResolution: ev.event_type === "resolution" && ev.actor !== "resolver",
-    });
-  });
-  return out;
-}
-
 export function ChatPanel({
   incidentId,
   status,
+  isSeedIncident = false,
   initialEvents,
   initialDraft = "",
-  onTurnComplete,
-  onClassificationChanged,
+  onIncidentChanged,
 }: {
   incidentId: string;
   status: IncidentStatus;
+  isSeedIncident?: boolean;
   initialEvents: TimelineEvent[];
   initialDraft?: string;
-  onTurnComplete: () => void;
-  onClassificationChanged?: () => void;
+  onIncidentChanged: () => void;
 }) {
   const { user } = useAuth();
-  // Seed una volta sola al mount (il parent passa key={incidentId} -> remount per incidente).
-  const [messages, setMessages] = useState<ChatMessage[]>(() => seedMessages(initialEvents));
+  const {
+    messages,
+    streaming,
+    toolActive,
+    activeAgent,
+    send,
+    confirmOverride,
+    cancelOverride,
+  } = useChatStream({ incidentId, status, initialEvents, user, onIncidentChanged });
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const nextLocalId = useRef(-1); // id negativi per i messaggi creati lato client
   const autoSent = useRef(false);
-  // Un ref, oltre allo stato visuale, blocca anche due click avvenuti prima che
-  // React abbia completato il re-render con il pulsante disabilitato.
-  const overrideRequestsInFlight = useRef(new Set<number>());
-  // Traccia il messaggio assistente attualmente in costruzione: aggiornato da
-  // ogni evento "phase" così i token successivi vanno nella bolla giusta.
-  const activeAssistantId = useRef<number | null>(null);
 
-  const closed = CLOSED_STATUSES.includes(status);
+  const closed = status === "resolved";
   const activeMention = mentionAtCursor(input, cursorPosition);
 
   // Auto-scroll in fondo a ogni aggiornamento.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, activeTool]);
+  }, [messages, toolActive]);
 
   // Classificazione automatica: appena si apre un incidente "open" non ancora
   // gestito, avviamo da soli il triage sulla descrizione, nessun click richiesto.
@@ -186,15 +129,14 @@ export function ChatPanel({
   useEffect(() => {
     if (autoSent.current) return;
     if (status !== "open" || !initialDraft) return;
-    if (initialEvents.some((e) => ASSISTANT_ACTORS.has(e.actor ?? ""))) return;
+    if (hasAssistantEvents(initialEvents)) return;
     autoSent.current = true;
     void send(initialDraft);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialDraft, initialEvents, send, status]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    void send();
+    void sendMessage();
   }
 
   function completeMention() {
@@ -210,197 +152,11 @@ export function ChatPanel({
     });
   }
 
-  // textArg valorizzato = invio automatico (es. auto-triage); undefined = dall'input utente.
-  async function send(textArg?: string) {
+  function sendMessage(textArg?: string) {
     const text = (textArg ?? input).trim();
-    if (!text || streaming) return false;
-
-    const userMsg: ChatMessage = {
-      id: nextLocalId.current--,
-      role: "user",
-      content: text,
-      timestamp: new Date().toISOString(),
-      senderId: user?.id,
-      senderUsername: user?.username,
-      senderTeam: user?.team_name,
-    };
-    const expectsAssistant = status === "open" || DEBRIEF_MENTION_RE.test(text);
-    const assistantId = expectsAssistant ? nextLocalId.current-- : null;
-    activeAssistantId.current = assistantId;
-    setMessages((prev) => [
-      ...prev,
-      userMsg,
-      ...(assistantId === null
-        ? []
-        : [
-            {
-              id: assistantId,
-              role: "assistant" as const,
-              content: "",
-              timestamp: new Date().toISOString(),
-            },
-          ]),
-    ]);
+    if (!text || streaming) return Promise.resolve(false);
     if (textArg === undefined) setInput("");
-    setStreaming(true);
-    setActiveTool(null);
-    setActiveAgent(null);
-
-    // Legge sempre activeAssistantId.current: si aggiorna automaticamente quando
-    // arriva un evento "phase" che crea una nuova bolla per l'agente successivo.
-    const patchAssistant = (patch: Partial<ChatMessage>) => {
-      // Cattura ora l'ID: React può applicare questo updater dopo che lo stream
-      // ha già cambiato o azzerato activeAssistantId.current.
-      const assistantId = activeAssistantId.current;
-      if (assistantId === null) return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, ...patch, content: patch.content ?? m.content } : m,
-        ),
-      );
-    };
-    const appendToken = (token: string) => {
-      // Stessa garanzia di patchAssistant per token, fallback e domande del triage.
-      const assistantId = activeAssistantId.current;
-      if (assistantId === null) return;
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
-      );
-    };
-
-    // Il backend è la fonte di verità sull'attivazione di Debrief. Se riceviamo
-    // un evento di routing senza aver previsto una bubble (per esempio per una
-    // variante di mention non riconosciuta localmente), la creiamo al volo.
-    const ensureAssistant = () => {
-      if (activeAssistantId.current !== null) return;
-      const newId = nextLocalId.current--;
-      activeAssistantId.current = newId;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: newId,
-          role: "assistant",
-          content: "",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    };
-
-    let streamFailed = false;
-    const onEvent = (ev: ChatEvent) => {
-      switch (ev.type) {
-        case "routing":
-          ensureAssistant();
-          patchAssistant({ agent: ev.agent === "none" ? "debrief" : ev.agent });
-          setActiveAgent(ev.agent === "none" ? "debrief" : ev.agent);
-          break;
-        case "tool":
-          setActiveTool(ev.name);
-          break;
-        case "triage":
-          patchAssistant({ agent: "triage", triage: ev.data });
-          break;
-        case "override_proposed":
-          patchAssistant({ agent: "override", overrideProposal: ev.data });
-          break;
-        case "human_help_required":
-          patchAssistant({ agent: "resolver", humanHelp: ev.data });
-          break;
-        case "phase": {
-          const newId = nextLocalId.current--;
-          activeAssistantId.current = newId;
-          setActiveTool(null);
-          setActiveAgent(ev.agent);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: newId,
-              role: "assistant",
-              content: "",
-              agent: ev.agent,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-          break;
-        }
-        case "token":
-          appendToken(ev.content);
-          break;
-        case "done":
-          setActiveTool(null);
-          setActiveAgent(null);
-          onTurnComplete();
-          break;
-        case "error":
-          streamFailed = true;
-          toast.error(ev.message);
-          appendToken(`\n\n[errore: ${ev.message}]`);
-          break;
-      }
-    };
-
-    try {
-      await streamChat(incidentId, text, onEvent);
-      return !streamFailed;
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Errore durante la chat");
-      patchAssistant({ content: "Si è verificato un errore. Riprova." });
-      return false;
-    } finally {
-      const emptyAssistantId = activeAssistantId.current;
-      if (emptyAssistantId !== null) {
-        setMessages((prev) =>
-          prev.filter(
-            (message) =>
-              message.id !== emptyAssistantId ||
-              Boolean(
-                message.content || message.triage || message.overrideProposal || message.humanHelp,
-              ),
-          ),
-        );
-      }
-      activeAssistantId.current = null;
-      setStreaming(false);
-      setActiveTool(null);
-      setActiveAgent(null);
-    }
-  }
-
-  async function handleOverrideConfirm(msgId: number) {
-    if (overrideRequestsInFlight.current.has(msgId)) return;
-    const msg = messages.find((m) => m.id === msgId);
-    if (!msg?.overrideProposal) return;
-    const { severity, add_teams, remove_teams } = msg.overrideProposal;
-    overrideRequestsInFlight.current.add(msgId);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "pending" } : m)),
-    );
-    try {
-      await incidentsApi.patchClassification(incidentId, {
-        severity: severity ?? undefined,
-        add_teams,
-        remove_teams,
-      });
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "confirmed" } : m)),
-      );
-      toast.success("Classificazione aggiornata");
-      onClassificationChanged?.();
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "idle" } : m)),
-      );
-      toast.error(err instanceof ApiError ? err.message : "Aggiornamento fallito");
-    } finally {
-      overrideRequestsInFlight.current.delete(msgId);
-    }
-  }
-
-  function handleOverrideCancel(msgId: number) {
-    if (overrideRequestsInFlight.current.has(msgId)) return;
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, overrideStatus: "cancelled" } : m)),
-    );
+    return send(text);
   }
 
   return (
@@ -418,9 +174,11 @@ export function ChatPanel({
         ref={scrollRef}
         className="flex-1 space-y-3 overflow-y-auto px-3 py-3 pb-20 sm:space-y-4 sm:p-4 sm:pb-24"
       >
-        {messages.length === 0 && (
+        {messages.length === 0 && isSeedIncident && (
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            Invia un messaggio per avviare il triage dell'incidente.
+            {closed
+              ? "Incidente importato. La conversazione originale non è disponibile. Consulta timeline e debriefing per i dettagli."
+              : "Incidente importato. La conversazione precedente non è disponibile; puoi iniziarne una menzionando @debrief."}
           </p>
         )}
         {messages.map((m) => (
@@ -428,14 +186,14 @@ export function ChatPanel({
             key={m.id}
             message={m}
             incidentId={incidentId}
-            onOverrideConfirm={handleOverrideConfirm}
-            onOverrideCancel={handleOverrideCancel}
+            onOverrideConfirm={confirmOverride}
+            onOverrideCancel={cancelOverride}
             currentUserId={user?.id}
             clarificationsDisabled={streaming}
-            onClarificationsSubmit={send}
+            onClarificationsSubmit={sendMessage}
           />
         ))}
-        {activeTool && <ToolBubble agent={activeAgent} />}
+        {toolActive && <ToolBubble agent={activeAgent} />}
       </div>
 
       {/* Input floating */}
@@ -497,7 +255,7 @@ export function ChatPanel({
                     }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      void send();
+                      void sendMessage();
                     }
                   }}
                   placeholder="Scrivi un messaggio…"

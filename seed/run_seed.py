@@ -17,20 +17,9 @@ migrazione o reset di un ambiente con dati importanti.
 """
 
 import os
-import sys      # serve per manipolare il "path" di import (vedi sotto)
+import sys      # accesso agli stream stdout/stderr
 import json
 import glob     # cerca file con un pattern (es. tutti i *.md in una cartella)
-
-for _stream in (sys.stdout, sys.stderr):
-    _reconfigure = getattr(_stream, "reconfigure", None)
-    if callable(_reconfigure):
-        _reconfigure(encoding="utf-8")
-
-# Aggiungi la cartella src/ al path di Python così possiamo importare `debrief`.
-# __file__ = percorso di questo script; dirname(__file__) = la sua cartella (seed/);
-# ".." sale alla root del progetto e poi entra in "src". sys.path.insert(0, ...)
-# mette questa cartella in cima alla lista dove Python cerca i moduli da importare.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Riusiamo le STESSE funzioni dell'app (DRY): seed e runtime scrivono in modo
 # identico, così i dati di seed e quelli creati a runtime hanno la stessa forma.
@@ -46,6 +35,11 @@ from debrief.rag.indexer import (
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8")
+
     print("\n================================================")
     print(" Debrief - Database seed")
     print("================================================")
@@ -144,9 +138,10 @@ def main():
 
     # Ora dividiamo il grande blocco di vettori nei due gruppi, nello stesso ordine
     # in cui li abbiamo concatenati. Usiamo lo slicing [inizio:fine] e un indice
-    # scorrevole `idx`. (Il `;` separa due istruzioni sulla stessa riga.)
+    # scorrevole `idx`.
     idx = 0
-    incident_vectors = all_vectors[idx:idx + len(rag_incidents)]; idx += len(rag_incidents)
+    incident_vectors = all_vectors[idx:idx + len(rag_incidents)]
+    idx += len(rag_incidents)
     kb_vectors = all_vectors[idx:idx + len(kb_docs)]
 
     # --- 4. Indicizza in LanceDB ---

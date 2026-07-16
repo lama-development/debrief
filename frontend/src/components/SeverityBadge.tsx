@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { SEVERITY_CLASS, SEVERITY_LABEL, SEVERITY_TOOLTIP } from "@/lib/labels";
+import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels";
 import type { Severity } from "@/lib/types";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -32,7 +32,7 @@ export function SeverityBadge({
           className,
         )}
       >
-        {SEVERITY_LABEL[severity]}
+        {severity}
       </span>
     </Tooltip>
   );

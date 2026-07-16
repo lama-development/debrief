@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { useIncidentInvalidation } from "@/hooks/useIncidentInvalidation";
 import { incidentsApi } from "@/lib/api";
 
 // Lista incidenti, opzionalmente filtrata per status.
@@ -12,12 +13,9 @@ export function useIncidents(status?: string) {
 
 // Crea un nuovo incidente; invalida lista e metriche al successo.
 export function useCreateIncident() {
-  const qc = useQueryClient();
+  const invalidate = useIncidentInvalidation();
   return useMutation({
     mutationFn: (description: string) => incidentsApi.create(description),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["incidents"] });
-      qc.invalidateQueries({ queryKey: ["metrics"] });
-    },
+    onSuccess: invalidate,
   });
 }

@@ -5,7 +5,7 @@ export type Severity = "SEV1" | "SEV2" | "SEV3" | "SEV4";
 
 export type IncidentStatus = "open" | "active" | "resolved";
 
-export type AgentRole = "triage" | "investigator" | "resolver" | "none";
+type AgentRole = "triage" | "investigator" | "resolver" | "none";
 
 export interface User {
   id: string;
@@ -55,7 +55,7 @@ export interface DebriefReport {
   timeline?: TimelineEvent[];
 }
 
-export interface IncidentParticipant {
+interface IncidentParticipant {
   id: string;
   username: string;
   team_id: string;

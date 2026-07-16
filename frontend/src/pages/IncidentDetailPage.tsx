@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,10 +16,11 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SEVERITY_CLASS, SEVERITY_TOOLTIP } from "@/lib/labels";
 import { useIncident, useReopenIncident } from "@/hooks/useIncident";
+import { useIncidentInvalidation } from "@/hooks/useIncidentInvalidation";
 import { useTeams } from "@/hooks/useTeams";
 import { useUpdateClassification } from "@/hooks/useUpdateClassification";
 import { ApiError } from "@/lib/api";
-import type { IncidentStatus, DebriefReport, Severity } from "@/lib/types";
+import type { DebriefReport, Severity } from "@/lib/types";
 
 const ALL_SEVERITIES: Severity[] = ["SEV1", "SEV2", "SEV3", "SEV4"];
 
@@ -55,11 +55,9 @@ function SeverityDropdown({
   );
 }
 
-const RESOLVABLE: IncidentStatus[] = ["open", "active"];
-
 export function IncidentDetailPage() {
   const { id = "" } = useParams();
-  const qc = useQueryClient();
+  const invalidateIncident = useIncidentInvalidation(id);
   const { data: incident, isLoading, isError } = useIncident(id);
   const { teams, teamName } = useTeams();
   const reopen = useReopenIncident(id);
@@ -106,9 +104,7 @@ export function IncidentDetailPage() {
     }
   }
 
-  const canResolve = RESOLVABLE.includes(incident.status);
   const isResolved = incident.status === "resolved";
-  const canOverride = !isResolved;
   const currentSeverity = incident.severity;
 
   async function onSeverityChange(newSev: Severity) {
@@ -164,7 +160,7 @@ export function IncidentDetailPage() {
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 sm:mt-1.5 sm:flex-nowrap">
                 <div className="flex min-w-0 items-center gap-2">
                   <StatusBadge status={incident.status} />
-                  {canOverride && incident.severity ? (
+                  {!isResolved && incident.severity ? (
                     <SeverityDropdown
                       value={incident.severity}
                       disabled={updateClass.isPending}
@@ -175,7 +171,7 @@ export function IncidentDetailPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:hidden">
-                  {canResolve && <ResolveDialog incidentId={incident.id} triggerSize="sm" />}
+                  {!isResolved && <ResolveDialog incidentId={incident.id} triggerSize="sm" />}
                   {isResolved && (
                     <Button
                       variant="outline"
@@ -190,7 +186,7 @@ export function IncidentDetailPage() {
               </div>
             </div>
             <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              {canResolve && <ResolveDialog incidentId={incident.id} />}
+              {!isResolved && <ResolveDialog incidentId={incident.id} />}
               {isResolved && (
                 <Button variant="outline" onClick={onReopen} disabled={reopen.isPending}>
                   Riapri
@@ -283,7 +279,7 @@ export function IncidentDetailPage() {
                         className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
                       >
                         {label}
-                        {canOverride && (
+                        {!isResolved && (
                           <button
                             type="button"
                             onClick={() => void onRemoveTeam(teamId)}
@@ -298,7 +294,7 @@ export function IncidentDetailPage() {
                     );
                   })}
 
-                  {canOverride && (
+                  {!isResolved && (
                     <div ref={teamPickerRef} className="contents">
                       {!showTeamPicker ? (
                         <button
@@ -328,7 +324,7 @@ export function IncidentDetailPage() {
                     </div>
                   )}
 
-                  {incident.involved_teams.length === 0 && !canOverride && (
+                  {incident.involved_teams.length === 0 && isResolved && (
                     <p className="text-xs text-muted-foreground">Nessun team coinvolto.</p>
                   )}
                 </div>
@@ -359,12 +355,10 @@ export function IncidentDetailPage() {
                 key={`${incident.id}:${incident.status}`}
                 incidentId={incident.id}
                 status={incident.status}
+                isSeedIncident={incident.created_by === null}
                 initialEvents={incident.timeline}
                 initialDraft={incident.status === "open" ? incident.description : ""}
-                onTurnComplete={() => qc.invalidateQueries({ queryKey: ["incident", incident.id] })}
-                onClassificationChanged={() =>
-                  qc.invalidateQueries({ queryKey: ["incident", incident.id] })
-                }
+                onIncidentChanged={invalidateIncident}
               />
             </CardContent>
           </Card>

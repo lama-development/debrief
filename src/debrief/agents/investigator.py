@@ -68,28 +68,3 @@ def build_investigation_prompt(question: str, incident_context: str = "", triage
         parts.append(f"<incident_description>\n{incident_context}\n</incident_description>")
     parts.append(f"Task: {question}")
     return "\n\n".join(parts)
-
-
-def investigate(agent: Agent, question: str, incident_context: str = "") -> str:
-    """Esegue un'indagine.
-
-    Args:
-        agent: L'investigator agent
-        question: La domanda dell'utente (es. "è già successo?")
-        incident_context: Contesto dell'incidente corrente (opzionale)
-
-    Returns:
-        La risposta dell'agente come stringa
-    """
-    prompt = build_investigation_prompt(question, incident_context)
-
-    try:
-        # run() bloccante: l'agente eventualmente chiama il tool di ricerca, poi
-        # restituisce la risposta testuale finale in response.content.
-        # `or ""` garantisce una stringa anche se content fosse None (la funzione
-        # promette di restituire str).
-        response = agent.run(prompt)
-        return response.content or ""
-    except Exception as e:
-        # Restituiamo l'errore come stringa così la chat mostra qualcosa invece di crashare.
-        return f"Investigation failed: {e}"
