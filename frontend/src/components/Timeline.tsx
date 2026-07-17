@@ -89,7 +89,6 @@ function toMilestones(events: TimelineEvent[], teamName: (teamId: string) => str
             const label = parsed.after.remove_teams.length === 1 ? "Team rimosso" : "Team rimossi";
             parts.push(`${label}: ${parsed.after.remove_teams.map(teamName).join(", ")}`);
           }
-          if (parsed.reason) parts.push(`motivo: ${parsed.reason}`);
           detail = parts.join(" · ") || undefined;
         } catch {
           detail = undefined;

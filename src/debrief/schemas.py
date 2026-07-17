@@ -54,7 +54,6 @@ class ClassificationOverrideRequest(BaseModel):
     severity: Severity | None = None
     add_teams: list[str] = []
     remove_teams: list[str] = []
-    reason: str | None = None
 
 
 class OverrideParams(BaseModel):

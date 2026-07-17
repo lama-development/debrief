@@ -342,7 +342,6 @@ def override_classification(
             "add_teams": add_teams,
             "remove_teams": remove_teams,
         },
-        "reason": override.reason,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False)
     db.add_timeline_event(incident_id, "override", actor, log)

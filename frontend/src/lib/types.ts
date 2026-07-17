@@ -74,7 +74,6 @@ export interface ClassificationOverrideRequest {
   severity?: Severity;
   add_teams?: string[];
   remove_teams?: string[];
-  reason?: string;
 }
 
 export interface Metrics {

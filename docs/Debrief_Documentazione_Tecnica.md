@@ -302,7 +302,7 @@ aggiungere o rimuovere. Il backend filtra gli ID non validi e invia una proposta
 alla UI; soltanto `PATCH /incidents/{id}/classification` applica la modifica.
 
 Ogni override effettivo aggiunge alla timeline un JSON con stato precedente,
-variazioni, motivazione e timestamp.
+variazioni e timestamp.
 
 ## 5. Persistenza e modello dati
 

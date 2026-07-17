@@ -153,7 +153,6 @@ debrief/
 ├── .env.example               # esempio del solo segreto richiesto
 ├── README.md                   # onboarding del progetto
 ├── docs/
-│   ├── README.md
 │   ├── Debrief_Documentazione_Tecnica.md
 │   └── Debrief_Guida_Sviluppo.md
 ├── src/debrief/
@@ -375,23 +374,23 @@ Tutte le route incidenti e metriche richiedono:
 Authorization: Bearer <token>
 ```
 
-| Metodo | Path                              | Body o query                                          |
-| ------ | --------------------------------- | ----------------------------------------------------- |
-| GET    | `/health`                         | —                                                     |
-| GET    | `/auth/teams`                     | —                                                     |
-| POST   | `/auth/register`                  | `username`, `password`, `team_id`                     |
-| POST   | `/auth/login`                     | `username`, `password`                                |
-| POST   | `/auth/logout`                    | —                                                     |
-| GET    | `/auth/me`                        | —                                                     |
-| POST   | `/incidents`                      | `description`                                         |
-| GET    | `/incidents`                      | `status?`, `limit=100`                                |
-| GET    | `/incidents/{id}`                 | —                                                     |
-| POST   | `/incidents/{id}/chat`            | `message`                                             |
-| PATCH  | `/incidents/{id}/classification`  | `severity?`, `add_teams?`, `remove_teams?`, `reason?` |
-| POST   | `/incidents/{id}/resolve`         | `resolution_summary`                                  |
-| POST   | `/incidents/{id}/reopen`          | —                                                     |
-| POST   | `/incidents/{id}/human-solutions` | `solution`                                            |
-| GET    | `/metrics`                        | —                                                     |
+| Metodo | Path                              | Body o query                               |
+| ------ | --------------------------------- | ------------------------------------------ |
+| GET    | `/health`                         | —                                          |
+| GET    | `/auth/teams`                     | —                                          |
+| POST   | `/auth/register`                  | `username`, `password`, `team_id`          |
+| POST   | `/auth/login`                     | `username`, `password`                     |
+| POST   | `/auth/logout`                    | —                                          |
+| GET    | `/auth/me`                        | —                                          |
+| POST   | `/incidents`                      | `description`                              |
+| GET    | `/incidents`                      | `status?`, `limit=100`                     |
+| GET    | `/incidents/{id}`                 | —                                          |
+| POST   | `/incidents/{id}/chat`            | `message`                                  |
+| PATCH  | `/incidents/{id}/classification`  | `severity?`, `add_teams?`, `remove_teams?` |
+| POST   | `/incidents/{id}/resolve`         | `resolution_summary`                       |
+| POST   | `/incidents/{id}/reopen`          | —                                          |
+| POST   | `/incidents/{id}/human-solutions` | `solution`                                 |
+| GET    | `/metrics`                        | —                                          |
 
 Usa `/docs` per payload, codici di stato e prove manuali. Le route non hanno
 version prefix; una futura API pubblica dovrebbe introdurre versioning.
