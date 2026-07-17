@@ -1,28 +1,20 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
-import { Bot, ExternalLink, Hash, Loader2, Search, Send, User as UserIcon } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { Bot, Hash, Loader2, Search, Send, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import { OverrideConfirmCard } from "@/components/OverrideConfirmCard";
 import { useAuth } from "@/auth/AuthContext";
 import { TriageCard } from "@/components/TriageCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  hasAssistantEvents,
-  useChatStream,
-  type ChatMessage,
-} from "@/hooks/useChatStream";
+import { hasAssistantEvents, useChatStream, type ChatMessage } from "@/hooks/useChatStream";
 import { incidentsApi, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getAgentIdentity } from "@/lib/agents";
 import type { HumanHelpRequest, IncidentStatus, TimelineEvent } from "@/lib/types";
-// Normalizza anche i trattini Unicode prodotti dagli LLM.
-const INCIDENT_REFERENCE_RE = /\bINC[-\u2010\u2011\u2012\u2013\u2014\u2015\u2212](\d{3,})\b/g;
-const EXISTING_INCIDENT_LINK_RE = /(\[INC-\d{3,}\]\([^)]+\))/g;
-const CODE_FENCE_OR_INLINE_RE = /(```[\s\S]*?```|`[^`\n]+`)/g;
+
+const AssistantMarkdown = lazy(() => import("@/components/AssistantMarkdown"));
+
 function mentionAtCursor(value: string, cursor: number) {
   const match = value.slice(0, cursor).match(/(^|\s)@([a-zA-Z0-9_-]*)$/);
   if (!match || !"debrief".startsWith(match[2].toLowerCase())) return null;
@@ -60,27 +52,6 @@ function formatMessageTime(timestamp: string) {
   });
 }
 
-// Normalizza il Markdown e collega gli ID senza alterare codice o collegamenti esistenti.
-function linkIncidentReferences(markdown: string) {
-  return markdown
-    .split(CODE_FENCE_OR_INLINE_RE)
-    .map((codeOrText, idx) => {
-      if (idx % 2 === 1) return codeOrText;
-      return codeOrText
-        .replace(/<br\s*\/?>|<\/br>/gi, "  \n")
-        .split(EXISTING_INCIDENT_LINK_RE)
-        .map((part, partIdx) => {
-          if (partIdx % 2 === 1) return part;
-          return part.replace(
-            INCIDENT_REFERENCE_RE,
-            (_match, digits: string) => `[INC-${digits}](/incidents/INC-${digits})`,
-          );
-        })
-        .join("");
-    })
-    .join("");
-}
-
 export function ChatPanel({
   incidentId,
   status,
@@ -97,15 +68,8 @@ export function ChatPanel({
   onIncidentChanged: () => void;
 }) {
   const { user } = useAuth();
-  const {
-    messages,
-    streaming,
-    toolActive,
-    activeAgent,
-    send,
-    confirmOverride,
-    cancelOverride,
-  } = useChatStream({ incidentId, status, initialEvents, user, onIncidentChanged });
+  const { messages, streaming, toolActive, activeAgent, send, confirmOverride, cancelOverride } =
+    useChatStream({ incidentId, status, initialEvents, user, onIncidentChanged });
   const [input, setInput] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
 
@@ -401,34 +365,9 @@ function MessageBubble({
               renderHumanMessage(message.content)
             ) : (
               <div className="prose prose-sm max-w-none leading-5 dark:prose-invert prose-headings:mb-1 prose-headings:mt-4 prose-headings:leading-tight prose-p:my-1 prose-p:leading-5 prose-blockquote:my-2 prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none prose-pre:my-1.5 prose-ol:my-1 prose-ol:pl-5 prose-ul:my-1 prose-ul:pl-5 prose-li:my-0 prose-li:leading-5 prose-table:my-2 prose-hr:my-3 [&>:first-child]:mt-0 [&_li+li]:mt-0.5 [&_li>p]:my-0">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ href, children }) => {
-                      const isIncidentLink =
-                        href !== undefined && /^\/incidents\/INC-\d{3,}$/.test(href);
-                      if (isIncidentLink) {
-                        return (
-                          <Link
-                            to={href}
-                            className="inline-flex items-center gap-1 rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                          >
-                            {children}
-                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                          </Link>
-                        );
-                      }
-
-                      return (
-                        <a href={href} target="_blank" rel="noreferrer">
-                          {children}
-                        </a>
-                      );
-                    },
-                  }}
-                >
-                  {linkIncidentReferences(message.content)}
-                </ReactMarkdown>
+                <Suspense fallback={<div className="whitespace-pre-wrap">{message.content}</div>}>
+                  <AssistantMarkdown content={message.content} />
+                </Suspense>
               </div>
             )}
           </div>
