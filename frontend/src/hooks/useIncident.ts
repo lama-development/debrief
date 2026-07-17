@@ -8,6 +8,7 @@ export function useIncident(id: string) {
     queryKey: ["incident", id],
     queryFn: () => incidentsApi.detail(id),
     enabled: !!id,
+    refetchOnMount: "always",
   });
 }
 

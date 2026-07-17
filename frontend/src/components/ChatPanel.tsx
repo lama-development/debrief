@@ -282,7 +282,7 @@ export function ChatPanel({
 function ToolBubble({ agent }: { agent: string | null }) {
   const identity = getAgentIdentity(agent ?? undefined);
   return (
-    <div className="ml-10 flex">
+    <div className="!-mt-1 ml-10 flex">
       <div
         className={cn(
           "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm",

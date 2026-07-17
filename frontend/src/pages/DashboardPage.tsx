@@ -85,7 +85,7 @@ export function DashboardPage() {
               <StatCard
                 title="Risolti"
                 value={resolvedCount}
-                description="Incidenti che sono stati contrassegnati come risolti."
+                description="Incidenti a cui hai accesso che sono stati contrassegnati come risolti."
               />
               <StatCard
                 title="MTTR medio"

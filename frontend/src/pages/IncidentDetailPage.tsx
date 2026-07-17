@@ -353,7 +353,7 @@ export function IncidentDetailPage() {
           >
             <CardContent className="min-h-0 flex-1 p-0">
               <ChatPanel
-                key={`${incident.id}:${incident.status}`}
+                key={incident.id}
                 incidentId={incident.id}
                 status={incident.status}
                 isSeedIncident={incident.created_by === null}

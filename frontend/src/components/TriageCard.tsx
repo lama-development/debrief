@@ -62,7 +62,7 @@ export function TriageCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl rounded-tl-sm border border-border bg-muted text-sm shadow-sm">
+    <div className="w-[32rem] max-w-full overflow-hidden rounded-2xl rounded-tl-sm border border-border bg-muted text-sm shadow-sm">
       <div className="p-3.5">
         <div className="mb-3 flex items-center gap-2.5 font-medium">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background/70 text-muted-foreground">
