@@ -113,7 +113,6 @@ export type ChatEvent =
   | { type: "tool"; name: string }
   | { type: "token"; content: string }
   | { type: "triage"; data: TriageData }
-  | { type: "phase"; agent: AgentRole }
   | { type: "override_proposed"; data: OverrideProposal }
   | { type: "human_help_required"; data: HumanHelpRequest }
   | { type: "done"; status: IncidentStatus; incident_id: string }

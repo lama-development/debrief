@@ -68,21 +68,13 @@ def create_resolver_agent(temperature: float | None = None) -> Agent:
     )
 
 
-def build_resolution_prompt(incident_description: str, additional_context: str = "", investigation_summary: str = "") -> str:
+def build_resolution_prompt(incident_description: str, additional_context: str = "") -> str:
     """Costruisce il prompt per la risoluzione."""
     prompt = f"""Propose remediation steps for the following incident:
 
 <incident_description>
 {incident_description}
 </incident_description>"""
-
-    if investigation_summary:
-        prompt += f"""
-
-<investigation_findings>
-The Investigator Agent already searched for similar past incidents. Use these findings to inform your remediation:
-{investigation_summary}
-</investigation_findings>"""
 
     if additional_context:
         prompt += f"""

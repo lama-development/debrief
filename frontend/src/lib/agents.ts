@@ -1,4 +1,4 @@
-export interface AgentIdentity {
+interface AgentIdentity {
   label: string;
   iconCls: string;
   bubbleCls: string;

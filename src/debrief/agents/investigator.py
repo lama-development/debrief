@@ -48,11 +48,9 @@ def create_investigator_agent() -> Agent:
     )
 
 
-def build_investigation_prompt(question: str, incident_context: str = "", triage_context: str = "") -> str:
+def build_investigation_prompt(question: str, incident_context: str = "") -> str:
     """Costruisce il prompt di indagine."""
     parts = []
-    if triage_context:
-        parts.append(f"<triage_results>\n{triage_context}\n</triage_results>")
     if incident_context:
         parts.append(f"<incident_description>\n{incident_context}\n</incident_description>")
     parts.append(f"Task: {question}")

@@ -103,8 +103,7 @@ def stream_chat(incident_id: str, message: str, user_id: str):
         yield {"type": "error", "message": str(e)}
 
 
-def _stream_triage(incident_id: str, message: str, description: str = "",
-                   conversation_context: str = ""):
+def _stream_triage(incident_id: str, message: str, description: str = "", conversation_context: str = ""):
     """Esegue il triage e restituisce evento e risultato strutturato."""
     teams, valid_ids = db.get_teams()
     agent = create_triage_agent(teams)
@@ -145,34 +144,28 @@ def _stream_triage(incident_id: str, message: str, description: str = "",
     return "TRIAGE_CLASSIFIED", triage
 
 
-def _stream_investigator(incident_id: str, message: str, description: str,
-                         triage_context: str = "", conversation_context: str = ""):
+def _stream_investigator(incident_id: str, message: str, description: str, conversation_context: str = ""):
     """Trasmette l'indagine progressivamente e ne restituisce il testo completo."""
     agent = create_investigator_agent()
     incident_context = description
     if conversation_context:
         incident_context += f"\n\n<conversation_history>\n{conversation_context}\n</conversation_history>"
-    prompt = build_investigation_prompt(message, incident_context, triage_context=triage_context)
+    prompt = build_investigation_prompt(message, incident_context)
     full, _ = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "message", "investigator", full)
     return full
 
 
-def _stream_resolver(incident_id: str, message: str, description: str,
-                     triage_context: str = "", investigation_summary: str = "",
-                     conversation_context: str = ""):
+def _stream_resolver(incident_id: str, message: str, description: str, conversation_context: str = ""):
     """Trasmette progressivamente i passi di risoluzione."""
     agent = create_resolver_agent()
     additional_parts = []
-    if triage_context:
-        additional_parts.append(f"Classification context:\n{triage_context}")
     if message:
         additional_parts.append(f"User request: {message}")
     if conversation_context:
         additional_parts.append(f"Conversation history:\n{conversation_context}")
     additional = "\n\n".join(additional_parts)
-    prompt = build_resolution_prompt(description, additional_context=additional,
-                                     investigation_summary=investigation_summary)
+    prompt = build_resolution_prompt(description, additional_context=additional)
     full, has_evidence = yield from _stream_agent_prose(agent, prompt)
     db.add_timeline_event(incident_id, "resolution", "resolver", full)
     if not has_evidence:
@@ -319,11 +312,11 @@ def override_classification(
     before_sev = incident.get("severity")
     before_teams = db.get_incident_teams(incident_id)
 
-    severity_changed = (
-        override.severity is not None and override.severity.value != before_sev
-    )
+    severity = override.severity
+    severity_changed = severity is not None and severity.value != before_sev
     if severity_changed:
-        db.update_incident_severity(incident_id, override.severity.value)
+        assert severity is not None
+        db.update_incident_severity(incident_id, severity.value)
 
     # Ignora duplicati e operazioni senza effetto, rendendo sicuri i nuovi tentativi.
     current_teams = set(before_teams)
@@ -345,7 +338,7 @@ def override_classification(
     log = json.dumps({
         "before": {"severity": before_sev, "teams": before_teams},
         "after": {
-            "severity": override.severity.value if severity_changed else before_sev,
+            "severity": severity.value if severity is not None else before_sev,
             "add_teams": add_teams,
             "remove_teams": remove_teams,
         },
@@ -448,8 +441,7 @@ def _index_resolved_incident(incident: dict, resolution_summary: str) -> None:
     upsert_past_incident(get_db(), inc_for_index, vector)
 
 
-def capture_human_solution(incident_id: str, solution_text: str,
-                           provided_by: str) -> dict:
+def capture_human_solution(incident_id: str, solution_text: str, provided_by: str) -> dict:
     """Salva una soluzione umana e prova a renderla subito recuperabile dal RAG."""
     incident = db.get_incident(incident_id)
     if incident is None:

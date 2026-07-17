@@ -242,25 +242,6 @@ export function useChatStream({
           case "human_help_required":
             patchAssistant({ agent: "resolver", humanHelp: event.data });
             break;
-          case "phase": {
-            // Ogni fase della sequenza automatica usa un messaggio distinto.
-            const id = nextLocalId.current--;
-            activeAssistantId.current = id;
-            dispatch({ type: "agent_changed", agent: event.agent });
-            dispatch({
-              type: "add_messages",
-              messages: [
-                {
-                  id,
-                  role: "assistant",
-                  content: "",
-                  agent: event.agent,
-                  timestamp: new Date().toISOString(),
-                },
-              ],
-            });
-            break;
-          }
           case "token":
             appendToken(event.content);
             break;
