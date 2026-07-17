@@ -544,22 +544,19 @@ utenti.
 
 ### 9.1 Runner
 
-`uv run eval` esegue sei suite:
+`uv run eval` esegue cinque suite:
 
-| Suite     | Esecuzione corrente           | Metriche principali                            |
-| --------- | ----------------------------- | ---------------------------------------------- |
-| triage    | 2 casi selezionati su 5       | severity exact, ±1, chiarimenti, team invalidi |
-| routing   | 3 casi selezionati su 5       | accuracy e fallback                            |
-| resolver  | 1 caso selezionato su 5       | ID citati riconosciuti e fonte seed attesa     |
-| retrieval | tutti i 5 casi                | precision@k, recall@k, MRR, hit@1              |
-| learning  | scenario sintetico nel runner | recuperabilità prima/dopo upsert               |
-| injection | 1 caso selezionato su 3       | tasso di blocco                                |
+| Suite     | Metriche principali                            |
+| --------- | ---------------------------------------------- |
+| triage    | severity exact, ±1, chiarimenti, team invalidi |
+| routing   | accuracy e fallback                            |
+| resolver  | ID citati riconosciuti e fonte seed attesa     |
+| retrieval | precision@k, recall@k, MRR, hit@1              |
+| injection | tasso di blocco                                |
 
-La selezione ridotta delle suite LLM limita il consumo del provider. Triage,
-routing, resolver e injection richiedono `GROQ_API_KEY`; senza chiave vengono
-saltate. Retrieval usa il modello di embedding locale e richiede le tabelle create
-dal seed. Learning usa invece un LanceDB temporaneo indipendente; nel runner
-completo viene comunque eseguito dopo retrieval.
+Triage, routing, resolver e injection richiedono `GROQ_API_KEY`; senza chiave
+vengono saltate. Retrieval usa il modello di embedding locale e richiede le
+tabelle create dal seed.
 
 La metrica resolver confronta gli ID citati con il catalogo seed e con un insieme
 atteso; non prova che ogni ID sia apparso nella tool call dello stesso turno e non

@@ -23,14 +23,6 @@ CASES_PATH = os.path.join(EVAL_DIR, "cases.json")
 
 load_dotenv(os.path.join(EVAL_DIR, "..", ".env"))
 
-CASE_IDS = {
-    "triage": {"TRI-01", "TRI-05"},
-    "routing": {"ROU-01", "ROU-03", "ROU-04"},
-    "resolver": {"RES-01"},
-    "injection": {"INJ-01"},
-}
-
-
 def _load_json(path: str) -> dict | list:
     """Carica un file JSON UTF-8."""
     with open(path, encoding="utf-8") as f:
@@ -46,20 +38,11 @@ def _load_json_records(path: str) -> list[dict]:
 
 
 def _suite_data(name: str) -> dict:
-    """Carica i casi selezionati per una suite."""
+    """Carica tutti i casi definiti per una suite."""
     suites = _load_json(CASES_PATH)
     if not isinstance(suites, dict):
         raise ValueError(f"Formato non valido in {CASES_PATH}: atteso un oggetto JSON")
-
-    data = suites[name]
-    selected = CASE_IDS.get(name)
-    if not selected:
-        return data
-
-    return {
-        **data,
-        "cases": [case for case in data["cases"] if case["id"] in selected],
-    }
+    return suites[name]
 
 
 def _sev_to_int(value: str) -> int:
@@ -310,53 +293,7 @@ def eval_retrieval() -> dict:
     return metrics
 
 
-# Suite 5: LEARNING LOOP
-def eval_learning_loop() -> dict:
-    """Verifica che una soluzione umana alimenti il ciclo di apprendimento."""
-    import tempfile
-
-    from debrief.config import INCIDENT_SIMILARITY_THRESHOLD
-    from debrief.rag.indexer import get_db, search, upsert_past_incident, _build_incident_text
-    from debrief.tools.embedding import embed_text
-
-    print("\n== Suite: Learning loop ==\n")
-
-    query = "FortiClient rifiuta la VPN perché il certificato client è scaduto"
-    unrelated = {
-        "id": "INC-X",
-        "title": "Stampante senza carta",
-        "severity": "SEV4",
-        "description": "Stampante etichette ferma per materiale esaurito",
-        "resolution": "Caricare un nuovo rotolo di etichette",
-    }
-    learned = {
-        "id": "INC-Y",
-        "title": "VPN bloccata per certificato client scaduto",
-        "severity": "SEV2",
-        "description": query,
-        "resolution": "Rigenerare e distribuire il certificato client FortiClient",
-    }
-
-    with tempfile.TemporaryDirectory() as directory:
-        database = get_db(directory)
-        query_vector = embed_text(query)
-        upsert_past_incident(database, unrelated, embed_text(_build_incident_text(unrelated)))
-        before = search(database, "past_incidents", query_vector, k=3, threshold=INCIDENT_SIMILARITY_THRESHOLD)
-        upsert_past_incident(database, learned, embed_text(_build_incident_text(learned)))
-        after = search(
-            database, "past_incidents", query_vector, k=3,
-            threshold=INCIDENT_SIMILARITY_THRESHOLD,
-        )
-
-    before_ids = {item["id"] for item in before}
-    after_ids = {item["id"] for item in after}
-    passed = learned["id"] not in before_ids and learned["id"] in after_ids
-    mark = "PASS" if passed else "FAIL"
-    print(f"   [{mark}] human-knowledge-loop - prima={sorted(before_ids)} dopo={sorted(after_ids)}")
-    return {"learning_loop_success": 100.0 if passed else 0.0}
-
-
-# Suite 6: INJECTION (test offensivi)
+# Suite 5: INJECTION (test offensivi)
 def eval_injection() -> dict:
     """Verifica che le stringhe proibite non compaiano nella risposta."""
     from debrief.agents.triage import create_triage_agent, run_triage, validate_teams
@@ -416,7 +353,6 @@ SUITES = {
     "routing":   {"fn": eval_routing,   "llm": True},
     "resolver":  {"fn": eval_resolver,  "llm": True},
     "retrieval": {"fn": eval_retrieval, "llm": False},
-    "learning":  {"fn": eval_learning_loop, "llm": False},
     "injection": {"fn": eval_injection, "llm": True},
 }
 

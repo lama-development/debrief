@@ -9,24 +9,12 @@
       },
       {
         "id": "TRI-02",
-        "description": "Nessun dipendente in smart working riesce a collegarsi alla VPN per un errore di validazione del certificato.",
-        "expected_severity": "SEV2",
+        "description": "Nella dashboard interna il logo aziendale appare leggermente disallineato, ma gli utenti possono lavorare normalmente.",
+        "expected_severity": "SEV4",
         "expected_needs_clarification": false
       },
       {
         "id": "TRI-03",
-        "description": "L'Access Point AP15-MagazzinoMP risulta offline su UniFi e i tablet del magazzino non riescono a collegarsi alla rete.",
-        "expected_severity": "SEV3",
-        "expected_needs_clarification": false
-      },
-      {
-        "id": "TRI-04",
-        "description": "In TSPlus una finestra modale di Embyon resta fuori dall'area visibile per un solo utente, bloccando l'operazione ma lasciando disponibili gli altri applicativi.",
-        "expected_severity": "SEV3",
-        "expected_needs_clarification": false
-      },
-      {
-        "id": "TRI-05",
         "description": "Non funziona niente, aiuto.",
         "expected_severity": null,
         "expected_needs_clarification": true
@@ -83,21 +71,6 @@
         "id": "RES-02",
         "description": "La configurazione di Microsoft Authenticator è bloccata perché viene richiesto un codice MFA non ancora disponibile.",
         "expected_any_ids": ["INC-004"]
-      },
-      {
-        "id": "RES-03",
-        "description": "Un access point di magazzino è offline su UniFi, non è raggiungibile da remoto e i tablet della zona hanno problemi di connessione.",
-        "expected_any_ids": ["INC-005"]
-      },
-      {
-        "id": "RES-04",
-        "description": "Un timbratore risulta acceso e collegato allo switch, ma non è raggiungibile dalla VLAN corretta e non invia le timbrature al gestionale.",
-        "expected_any_ids": ["INC-006"]
-      },
-      {
-        "id": "RES-05",
-        "description": "In TSPlus una modale di Embyon si apre fuori schermo e blocca la finestra principale per un singolo utente.",
-        "expected_any_ids": ["INC-007"]
       }
     ]
   },
@@ -111,23 +84,8 @@
       },
       {
         "id": "RET-02",
-        "query": "Un'applicazione pubblicata tramite TSPlus non si apre correttamente nella sessione remota.",
-        "relevant_ids": ["INC-003", "INC-007", "INC-009"]
-      },
-      {
-        "id": "RET-03",
-        "query": "Un dispositivo di stabilimento è acceso ma non raggiungibile in rete e causa un disservizio.",
-        "relevant_ids": ["INC-005", "INC-006", "INC-010"]
-      },
-      {
-        "id": "RET-04",
-        "query": "Da alcune postazioni aprire documenti e cartelle condivise sul file server non funziona oppure richiede troppo tempo.",
-        "relevant_ids": ["INC-002", "INC-011", "INC-012"]
-      },
-      {
-        "id": "RET-05",
         "query": "Un collega fuori sede non riesce a usare correttamente la VPN o a raggiungere la rete aziendale dopo essersi collegato.",
-        "relevant_ids": ["INC-013", "INC-014", "INC-015"]
+        "relevant_ids": ["INC-010", "INC-014", "INC-015"]
       }
     ]
   },

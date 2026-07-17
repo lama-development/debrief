@@ -149,8 +149,7 @@ account dalla schermata di registrazione. La documentazione interattiva dell'API
 | `frontend/` | `npm run format` | formatta i file con Prettier                          |
 
 Le suite `triage`, `routing`, `resolver` e `injection` richiedono Groq. Senza
-`GROQ_API_KEY`, il runner le segnala come saltate ed esegue comunque `retrieval`
-e `learning`.
+`GROQ_API_KEY`, il runner le segnala come saltate ed esegue comunque `retrieval`.
 
 ## Documentazione
 

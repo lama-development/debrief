@@ -498,20 +498,20 @@ usare il seed come migrazione.
 
 `uv run eval` esegue:
 
-| Suite     | Casi effettivamente selezionati | Richiede Groq |
-| --------- | ------------------------------: | ------------- |
-| triage    |                          2 di 5 | sì            |
-| routing   |                          3 di 5 | sì            |
-| resolver  |                          1 di 5 | sì            |
-| retrieval |                          5 di 5 | no            |
-| learning  |           1 scenario nel codice | no            |
-| injection |                          1 di 3 | sì            |
+| Suite     | Richiede Groq |
+| --------- | ------------- |
+| triage    | sì            |
+| routing   | sì            |
+| resolver  | sì            |
+| retrieval | no            |
+| injection | sì            |
 
-Senza chiave, le suite LLM sono marcate `SKIP`; retrieval e learning restano
-eseguibili. Esegui prima il seed.
+Il runner esegue sempre tutti i casi presenti in `eval/cases.json`. Senza chiave,
+le suite LLM sono marcate `SKIP`; retrieval resta eseguibile. Esegui prima il
+seed.
 
 Il runner misura accuratezza, fallback, ID di incidente citati rispetto alle
-attese seed, precision/recall/MRR, learning loop e blocco di prompt injection.
+attese seed, precision/recall/MRR e blocco di prompt injection.
 Non verifica la provenance dei runbook o il trace completo delle tool call.
 Stampa soltanto su console e non è un quality gate completo: non testa API, auth,
 lifecycle, SSE, concorrenza o UI.
@@ -549,7 +549,7 @@ Quando aggiungi una capacità, preferisci:
 1. cambia `config.py`, `tools/embedding.py` o `rag/`;
 2. esegui nuovamente `uv run seed`, perché i vettori esistenti non si aggiornano
    automaticamente al cambio modello;
-3. esegui retrieval, resolver e learning;
+3. esegui retrieval e resolver;
 4. registra i risultati se il cambiamento deve essere confrontabile.
 
 ## 15. Troubleshooting
