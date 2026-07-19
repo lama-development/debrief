@@ -291,9 +291,9 @@ Il resolver propone passi operativi usando:
 2. `search_knowledge_base(query)`;
 3. conoscenza generale, dichiarata come tale quando le fonti interne non bastano.
 
-Il resolver non esegue azioni sui sistemi e non chiude l'incidente. Se nessuna
-tool call restituisce evidenze utili, il service emette
-`human_help_required` e registra un'escalation.
+Il resolver non esegue azioni sui sistemi, non chiude l'incidente e non genera il
+debriefing finale. Se nessuna tool call restituisce evidenze utili, il service
+emette `human_help_required` e registra un'escalation.
 
 ### 4.5 Override
 
@@ -425,11 +425,8 @@ Distribuzione degli incidenti:
 | Stato      | Numero | Uso                                            |
 | ---------- | -----: | ---------------------------------------------- |
 | `resolved` |     15 | indicizzati inizialmente in `past_incidents`   |
-| `active`   |      3 | persistiti in SQLite come casi in lavorazione  |
-| `open`     |      2 | persistiti in SQLite come casi da classificare |
 
-Tutti i 20 record vengono persistiti in SQLite; soltanto i 15 risolti entrano
-nel RAG iniziale.
+Tutti i 15 record vengono persistiti in SQLite ed entrano nel RAG iniziale.
 
 Lo script crea le tabelle mancanti, inserisce o sostituisce i record seed,
 rigenera le due collezioni LanceDB ed esegue tre query di smoke test. Non azzera
@@ -533,12 +530,17 @@ La UI:
 - persiste tema e sessione in `localStorage`;
 - usa una vista a due pannelli su desktop e tab su mobile.
 
-React Query considera i dati fresh per 30 secondi. Gli hook di lifecycle
-invalidano dettaglio, lista e metriche; il completamento della chat e un override
-confermato in chat invalidano invece soltanto il dettaglio. Lista e metriche
-possono quindi restare stale fino alla scadenza. Non esiste un canale realtime
-globale: SSE copre il singolo turno, non gli aggiornamenti prodotti da altri
-utenti.
+React Query considera i dati fresh per 30 secondi. `useIncidentInvalidation`
+invalida il dettaglio, quando riceve un ID, oltre alla lista e alle metriche. Lo
+stesso callback viene usato dagli hook di lifecycle, al completamento della chat
+e dopo la conferma di un override, mantenendo allineate le tre viste. Non esiste
+però un canale realtime globale: SSE copre il singolo turno, non gli aggiornamenti
+prodotti da altri utenti.
+
+La build corrente separa `AssistantMarkdown`, caricato con `React.lazy`, dal
+bundle principale: le dimensioni non compresse sono circa 425 kB per il chunk
+principale e 155 kB per il chunk Markdown. Vite non segnala quindi più un singolo
+chunk oltre 500 kB.
 
 ## 9. Valutazione
 
@@ -596,7 +598,6 @@ come quality gate completo.
 | Input           | nessun limite applicativo alla lunghezza di descrizioni e messaggi | limiti, quote e controllo del costo token         |
 | Retrieval       | errore e assenza risultati appaiono uguali                         | errori tipizzati e health check                   |
 | Streaming       | nessun heartbeat, resume o cancel UI                               | protocollo resiliente                             |
-| Bundle frontend | la build segnala un chunk oltre 500 kB                             | analisi bundle e code splitting per rotta         |
 | Configurazione  | URL, CORS, host e porta di sviluppo fissi                          | configurazione per ambiente                       |
 | Test            | harness AI mirato, nessuna regressione completa                    | unit, integration, E2E e load test                |
 | Integrazioni    | nessun alert, ticketing o notifica                                 | connettori e webhook                              |

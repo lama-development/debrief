@@ -40,7 +40,7 @@ class TimelineEvent(BaseModel):
 
 
 class DebriefReport(BaseModel):
-    """Report generato dal Resolver e salvato come JSON alla chiusura."""
+    """Report assemblato dal service e salvato come JSON alla chiusura."""
     incident_id: str
     title: str
     severity: Severity
