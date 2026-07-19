@@ -4,7 +4,7 @@ import logging
 
 from debrief.config import (
     INCIDENT_SIMILARITY_THRESHOLD,
-    SIMILARITY_THRESHOLD,
+    KNOWLEDGE_BASE_SIMILARITY_THRESHOLD,
     TOP_K_INCIDENTS,
     TOP_K_KB,
 )
@@ -39,7 +39,7 @@ def retrieve_similar_incidents(
 def retrieve_knowledge(
     query: str,
     k: int = TOP_K_KB,
-    threshold: float = SIMILARITY_THRESHOLD,
+    threshold: float = KNOWLEDGE_BASE_SIMILARITY_THRESHOLD,
 ) -> list[dict]:
     """Recupera articoli e procedure dalla base di conoscenza."""
     return _retrieve(query, "knowledge_base", k, threshold)

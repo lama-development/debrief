@@ -3,7 +3,7 @@
 from agno.agent import Agent
 from agno.models.groq import Groq
 
-from debrief.config import MODELS, TEMPERATURE
+from debrief.config import MODELS, REASONING_EFFORT, TEMPERATURE
 from debrief.tools.search import search_past_incidents
 
 
@@ -38,7 +38,14 @@ def create_investigator_agent() -> Agent:
     """Crea l'agente Investigator configurato."""
     return Agent(
         name="Investigator Agent",
-        model=Groq(id=MODELS["investigator"], temperature=TEMPERATURE["investigator"]),
+        model=Groq(
+            id=MODELS["investigator"],
+            temperature=TEMPERATURE["investigator"],
+            request_params={
+                "reasoning_effort": REASONING_EFFORT["investigator"],
+                "reasoning_format": "hidden",
+            },
+        ),
         description="Cerca incidenti simili nel database e identifica pattern ricorrenti.",
         instructions=INVESTIGATOR_INSTRUCTIONS,
         tools=[search_past_incidents],

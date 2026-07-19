@@ -224,16 +224,19 @@ retrieval locale. Serve a router, triage, investigator, resolver e alle suite LL
 
 `src/debrief/config.py` contiene:
 
-| Componente            | Valore corrente                        |
-| --------------------- | -------------------------------------- |
-| router                | `openai/gpt-oss-20b`, temperatura 0    |
-| triage                | `openai/gpt-oss-120b`, temperatura 0   |
-| investigator          | `openai/gpt-oss-120b`, temperatura 0,2 |
-| resolver              | `openai/gpt-oss-120b`, temperatura 0,3 |
-| top-k incidenti       | 3                                      |
-| top-k knowledge base  | 3                                      |
-| soglia incidenti      | 0,55                                   |
-| soglia knowledge base | 0,35                                   |
+| Componente            | Modello / valore           | Temperatura | Reasoning |
+| --------------------- | -------------------------- | ----------: | --------- |
+| router                | `openai/gpt-oss-20b`        |         0,5 | `low`     |
+| triage                | `openai/gpt-oss-20b`        |         0,5 | `medium`  |
+| investigator          | `openai/gpt-oss-20b`        |         0,5 | `medium`  |
+| resolver              | `openai/gpt-oss-120b`       |         0,6 | `medium`  |
+| top-k incidenti       | 3                          |           — | —         |
+| top-k knowledge base  | 3                          |           — | —         |
+| soglia incidenti      | 0,55                       |           — | —         |
+| soglia knowledge base | 0,35                       |           — | —         |
+
+Gli agenti passano `reasoning_effort` a Groq e usano `reasoning_format="hidden"`:
+il ragionamento interno non viene incluso nella risposta applicativa.
 
 I nomi dei modelli e le soglie non sono configurabili via `.env` nella versione
 corrente: modifica `config.py` e riesegui le verifiche pertinenti.

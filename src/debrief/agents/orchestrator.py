@@ -6,7 +6,7 @@ import logging
 from agno.agent import Agent
 from agno.models.groq import Groq
 
-from debrief.config import MODELS, TEMPERATURE
+from debrief.config import MODELS, REASONING_EFFORT, TEMPERATURE
 from debrief.schemas import AgentRole, OverrideParams, RoutingDecision, Severity
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,14 @@ def create_router_agent() -> Agent:
     """Crea il router con un modello piccolo e una risposta JSON deterministica."""
     return Agent(
         name="Router",
-        model=Groq(id=MODELS["orchestrator"], temperature=TEMPERATURE["orchestrator"]),
+        model=Groq(
+            id=MODELS["orchestrator"],
+            temperature=TEMPERATURE["orchestrator"],
+            request_params={
+                "reasoning_effort": REASONING_EFFORT["orchestrator"],
+                "reasoning_format": "hidden",
+            },
+        ),
         description="Routes incident chat messages to the correct specialist agent.",
         instructions=ROUTER_SYSTEM_PROMPT,
         use_json_mode=True,

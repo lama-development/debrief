@@ -5,7 +5,7 @@ import logging
 from agno.agent import Agent, RunOutput
 from agno.models.groq import Groq
 
-from debrief.config import MODELS, TEMPERATURE
+from debrief.config import MODELS, REASONING_EFFORT, TEMPERATURE
 from debrief.schemas import TriageOutput
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,14 @@ def create_triage_agent(teams: list[dict]) -> Agent:
     """Crea l'agente Triage configurato."""
     return Agent(
         name="Triage Agent",
-        model=Groq(id=MODELS["triage"], temperature=TEMPERATURE["triage"]),
+        model=Groq(
+            id=MODELS["triage"],
+            temperature=TEMPERATURE["triage"],
+            request_params={
+                "reasoning_effort": REASONING_EFFORT["triage"],
+                "reasoning_format": "hidden",
+            },
+        ),
         description="Classifica incidenti IT in base alla descrizione fornita.",
         instructions=build_system_prompt(teams),
         output_schema=TriageOutput,

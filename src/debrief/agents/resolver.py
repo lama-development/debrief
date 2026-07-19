@@ -3,7 +3,7 @@
 from agno.agent import Agent
 from agno.models.groq import Groq
 
-from debrief.config import MODELS, TEMPERATURE
+from debrief.config import MODELS, REASONING_EFFORT, TEMPERATURE
 from debrief.tools.search import search_past_incidents, search_knowledge_base
 
 
@@ -59,6 +59,10 @@ def create_resolver_agent(temperature: float | None = None) -> Agent:
         model=Groq(
             id=MODELS["resolver"],
             temperature=TEMPERATURE["resolver"] if temperature is None else temperature,
+            request_params={
+                "reasoning_effort": REASONING_EFFORT["resolver"],
+                "reasoning_format": "hidden",
+            },
         ),
         description="Propone passi di risoluzione per gli incidenti basandosi su knowledge base e incidenti passati.",
         instructions=RESOLVER_INSTRUCTIONS,
